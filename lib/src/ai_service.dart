@@ -11,8 +11,23 @@ enum AiCoreStatus { unavailable, downloadable, downloading, available }
 class AiResponse {
   final String text;
   final bool isTruncated;
+  final int? inputTokens;
+  final int? outputTokens;
+  final int? totalTokens;
+  final double? estimatedCostUsd;
 
-  AiResponse({required this.text, this.isTruncated = false});
+  AiResponse({
+    required this.text,
+    this.isTruncated = false,
+    this.inputTokens,
+    this.outputTokens,
+    int? totalTokens,
+    this.estimatedCostUsd,
+  }) : totalTokens =
+           totalTokens ??
+           (inputTokens != null && outputTokens != null
+               ? inputTokens + outputTokens
+               : null);
 }
 
 @visibleForTesting

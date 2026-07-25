@@ -598,7 +598,82 @@ void main() {
 
       // Simple unclosed array/object
       expect(repairJson('[{"a": 1'), equals('[{"a": 1}]'));
+    });
 
+    test(
+      'AgentHistoryEntry serializes and deserializes token metrics and estimated cost',
+      () {
+        final entry = AgentHistoryEntry(
+          timestamp: DateTime.parse('2026-07-24T12:00:00Z'),
+          prompt: 'Test prompt',
+          response: 'Test response',
+          isError: false,
+          modelName: 'gemini-3.6-flash',
+          inputTokens: 150,
+          outputTokens: 50,
+          estimatedCostUsd: 0.00002625,
+        );
+
+        expect(entry.inputTokens, equals(150));
+        expect(entry.outputTokens, equals(50));
+        expect(entry.totalTokens, equals(200));
+        expect(entry.estimatedCostUsd, equals(0.00002625));
+
+        final json = entry.toJson();
+        expect(json['inputTokens'], equals(150));
+        expect(json['outputTokens'], equals(50));
+        expect(json['totalTokens'], equals(200));
+        expect(json['estimatedCostUsd'], equals(0.00002625));
+
+        final deserialized = AgentHistoryEntry.fromJson(json);
+        expect(deserialized.inputTokens, equals(150));
+        expect(deserialized.outputTokens, equals(50));
+        expect(deserialized.totalTokens, equals(200));
+        expect(deserialized.estimatedCostUsd, equals(0.00002625));
+      },
+    );
+
+    test(
+      'CloudAiService parses usage tokens and calculates estimatedCostUsd',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'content': 'Hello from AI'},
+                  'finish_reason': 'stop',
+                },
+              ],
+              'usage': {
+                'prompt_tokens': 100,
+                'completion_tokens': 20,
+                'total_tokens': 120,
+              },
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-3.6-flash',
+          httpClient: mockClient,
+        );
+
+        final res = await service.generateContentRaw(prompt: 'Hello');
+        expect(res, isNotNull);
+        expect(res!.text, equals('Hello from AI'));
+        expect(res.inputTokens, equals(100));
+        expect(res.outputTokens, equals(20));
+        expect(res.totalTokens, equals(120));
+        // gemini-3.6-flash: 100/1M * 1.50 + 20/1M * 7.50 = 0.00015 + 0.00015 = 0.00030
+        expect(res.estimatedCostUsd, closeTo(0.0003, 0.0000001));
+      },
+    );
+
+    test('repairJson structural balancing', () {
       // Empty string
       expect(repairJson(''), equals(''));
 

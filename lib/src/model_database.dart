@@ -8,6 +8,8 @@ class CloudModelInfo {
   final int? limitTpm;
   final int? limitRpd;
   final int? limitRps;
+  final double inputPricePerMillion;
+  final double outputPricePerMillion;
   final String description;
 
   const CloudModelInfo({
@@ -18,6 +20,8 @@ class CloudModelInfo {
     this.limitTpm,
     this.limitRpd,
     this.limitRps,
+    this.inputPricePerMillion = 0.0,
+    this.outputPricePerMillion = 0.0,
     required this.description,
   });
 }
@@ -31,6 +35,8 @@ class CloudModelDatabase {
       limitRpm: 5,
       limitTpm: 250000,
       limitRpd: 20,
+      inputPricePerMillion: 1.50,
+      outputPricePerMillion: 7.50,
       description: 'Free Tier Limits: 5 RPM / 250k TPM / 20 RPD',
     ),
     CloudModelInfo(
@@ -40,6 +46,8 @@ class CloudModelDatabase {
       limitRpm: 5,
       limitTpm: 250000,
       limitRpd: 20,
+      inputPricePerMillion: 1.50,
+      outputPricePerMillion: 9.00,
       description: 'Free Tier Limits: 5 RPM / 250k TPM / 20 RPD',
     ),
     CloudModelInfo(
@@ -49,6 +57,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 500,
+      inputPricePerMillion: 0.75,
+      outputPricePerMillion: 3.00,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 500 RPD',
     ),
     CloudModelInfo(
@@ -58,6 +68,8 @@ class CloudModelDatabase {
       limitRpm: null,
       limitTpm: null,
       limitRpd: null,
+      inputPricePerMillion: 2.00,
+      outputPricePerMillion: 12.00,
       description: 'Paid Tier Only (No free tier)',
     ),
     CloudModelInfo(
@@ -67,6 +79,8 @@ class CloudModelDatabase {
       limitRpm: 5,
       limitTpm: 250000,
       limitRpd: 20,
+      inputPricePerMillion: 1.50,
+      outputPricePerMillion: 9.00,
       description: 'Free Tier Limits: 5 RPM / 250k TPM / 20 RPD',
     ),
     CloudModelInfo(
@@ -76,6 +90,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 500,
+      inputPricePerMillion: 0.25,
+      outputPricePerMillion: 1.50,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 500 RPD',
     ),
     CloudModelInfo(
@@ -85,6 +101,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 1,500 RPD',
     ),
     CloudModelInfo(
@@ -94,6 +112,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 1,500 RPD',
     ),
     CloudModelInfo(
@@ -103,6 +123,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 1,500 RPD',
     ),
     CloudModelInfo(
@@ -112,6 +134,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 1,500 RPD',
     ),
     CloudModelInfo(
@@ -121,6 +145,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 250000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 15 RPM / 250k TPM / 1,500 RPD',
     ),
     CloudModelInfo(
@@ -130,6 +156,8 @@ class CloudModelDatabase {
       limitRpm: 2,
       limitTpm: 32000,
       limitRpd: 50,
+      inputPricePerMillion: 1.25,
+      outputPricePerMillion: 10.00,
       description: 'Free Tier Limits: 2 RPM / 32k TPM / 50 RPD',
     ),
     CloudModelInfo(
@@ -139,6 +167,8 @@ class CloudModelDatabase {
       limitRpm: 15,
       limitTpm: 1000000,
       limitRpd: 1500,
+      inputPricePerMillion: 0.30,
+      outputPricePerMillion: 2.50,
       description: 'Free Tier Limits: 15 RPM / 1M TPM / 1,500 RPD',
     ),
   ];
@@ -149,6 +179,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: false,
       limitRps: 2,
+      inputPricePerMillion: 1.40,
+      outputPricePerMillion: 1.40,
       description: 'Commercial: 2 RPS (Approx. \$1.40 / 1M input tokens)',
     ),
     CloudModelInfo(
@@ -156,6 +188,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: true,
       limitRps: 2,
+      inputPricePerMillion: 0.80,
+      outputPricePerMillion: 0.80,
       description: 'Commercial: 2 RPS (Flagship Vision Model)',
     ),
     CloudModelInfo(
@@ -163,6 +197,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: true,
       limitRps: 2,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 2 RPS (Zero cost vision model)',
     ),
     CloudModelInfo(
@@ -170,6 +206,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: false,
       limitRps: 2,
+      inputPricePerMillion: 0.0,
+      outputPricePerMillion: 0.0,
       description: 'Free Tier Limits: 2 RPS (zero cost, completely free)',
     ),
     CloudModelInfo(
@@ -177,6 +215,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: false,
       limitRps: 2,
+      inputPricePerMillion: 0.14,
+      outputPricePerMillion: 0.14,
       description: 'Commercial: 2 RPS (Standard capability)',
     ),
     CloudModelInfo(
@@ -184,6 +224,8 @@ class CloudModelDatabase {
       provider: CloudProvider.zhipu,
       isVision: false,
       limitRps: 2,
+      inputPricePerMillion: 0.14,
+      outputPricePerMillion: 0.14,
       description: 'Commercial: 2 RPS (Light, balanced)',
     ),
   ];
@@ -226,5 +268,19 @@ class CloudModelDatabase {
   /// Retrieve model details/limits by name in O(1) time.
   static CloudModelInfo? getModelInfo(String modelName) {
     return _modelsMap[modelName];
+  }
+
+  /// Calculates estimated cost in USD for given input and output token counts.
+  static double calculateEstimatedCost(
+    String? modelName, {
+    required int inputTokens,
+    required int outputTokens,
+  }) {
+    if (modelName == null) return 0.0;
+    final info = getModelInfo(modelName);
+    if (info == null) return 0.0;
+    final inputCost = (inputTokens / 1000000.0) * info.inputPricePerMillion;
+    final outputCost = (outputTokens / 1000000.0) * info.outputPricePerMillion;
+    return inputCost + outputCost;
   }
 }

@@ -128,8 +128,37 @@ class CloudAiService extends AiService {
       final finishReason = choice?['finish_reason'] as String?;
       final isTruncated = finishReason == 'length';
 
+      final usage = data['usage'] as Map<String, dynamic>?;
+      int? inputTokens = usage?['prompt_tokens'] as int?;
+      int? outputTokens = usage?['completion_tokens'] as int?;
+      int? totalTokens = usage?['total_tokens'] as int?;
+
+      if (text != null) {
+        inputTokens ??= await countTokens(
+          prompt: prompt,
+          imageBytes: imageBytes,
+        );
+        outputTokens ??= await countTokens(prompt: text);
+        totalTokens ??= inputTokens + outputTokens;
+      }
+
+      final estimatedCost = (inputTokens != null && outputTokens != null)
+          ? CloudModelDatabase.calculateEstimatedCost(
+              modelName,
+              inputTokens: inputTokens,
+              outputTokens: outputTokens,
+            )
+          : null;
+
       if (text == null) return null;
-      return AiResponse(text: text, isTruncated: isTruncated);
+      return AiResponse(
+        text: text,
+        isTruncated: isTruncated,
+        inputTokens: inputTokens,
+        outputTokens: outputTokens,
+        totalTokens: totalTokens,
+        estimatedCostUsd: estimatedCost,
+      );
     } catch (e, stack) {
       debugPrint('Error in CloudAiService post request: $e\n$stack');
       return AiResponse(
