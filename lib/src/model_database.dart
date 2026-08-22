@@ -29,6 +29,17 @@ class CloudModelInfo {
 class CloudModelDatabase {
   static const List<CloudModelInfo> geminiModels = [
     CloudModelInfo(
+      modelName: 'gemini-3.7-flash',
+      provider: CloudProvider.gemini,
+      isVision: true,
+      limitRpm: 5,
+      limitTpm: 250000,
+      limitRpd: 20,
+      inputPricePerMillion: 1.50,
+      outputPricePerMillion: 7.50,
+      description: 'Free Tier Limits: 5 RPM / 250k TPM / 20 RPD',
+    ),
+    CloudModelInfo(
       modelName: 'gemini-3.6-flash',
       provider: CloudProvider.gemini,
       isVision: true,

@@ -6,6 +6,7 @@ void main() {
     test('CloudModelDatabase query APIs return expected models', () {
       final allModels = CloudModelDatabase.getAvailableModels();
       expect(allModels, isNotEmpty);
+      expect(allModels.any((m) => m.modelName == 'gemini-3.7-flash'), isTrue);
       expect(allModels.any((m) => m.modelName == 'gemini-3.5-flash'), isTrue);
       expect(allModels.any((m) => m.modelName == 'glm-4.7-flash'), isTrue);
 
@@ -16,6 +17,7 @@ void main() {
         geminiOnly.every((m) => m.provider == CloudProvider.gemini),
         isTrue,
       );
+      expect(geminiOnly.any((m) => m.modelName == 'gemini-3.7-flash'), isTrue);
       expect(geminiOnly.any((m) => m.modelName == 'gemini-3.5-flash'), isTrue);
       expect(geminiOnly.any((m) => m.modelName == 'glm-4.7-flash'), isFalse);
 
@@ -29,17 +31,33 @@ void main() {
 
     test('CloudModelDatabase getAvailableModelNames returns names', () {
       final allNames = CloudModelDatabase.getAvailableModelNames();
+      expect(allNames, contains('gemini-3.7-flash'));
       expect(allNames, contains('gemini-3.5-flash'));
       expect(allNames, contains('glm-4.7-flash'));
 
       final geminiNames = CloudModelDatabase.getAvailableModelNames(
         provider: CloudProvider.gemini,
       );
+      expect(geminiNames, contains('gemini-3.7-flash'));
       expect(geminiNames, contains('gemini-3.5-flash'));
       expect(geminiNames, isNot(contains('glm-4.7-flash')));
     });
 
     test('CloudModelDatabase getModelInfo retrieves details', () {
+      final info37 = CloudModelDatabase.getModelInfo('gemini-3.7-flash');
+      expect(info37, isNotNull);
+      expect(info37!.provider, equals(CloudProvider.gemini));
+      expect(info37.isVision, isTrue);
+      expect(info37.limitRpm, equals(5));
+      expect(info37.limitTpm, equals(250000));
+      expect(info37.limitRpd, equals(20));
+      expect(info37.inputPricePerMillion, equals(1.50));
+      expect(info37.outputPricePerMillion, equals(7.50));
+      expect(
+        info37.description,
+        equals('Free Tier Limits: 5 RPM / 250k TPM / 20 RPD'),
+      );
+
       final info36 = CloudModelDatabase.getModelInfo('gemini-3.6-flash');
       expect(info36, isNotNull);
       expect(info36!.provider, equals(CloudProvider.gemini));
@@ -76,6 +94,10 @@ void main() {
         isVision: true,
       );
       expect(visionModels.every((m) => m.isVision), isTrue);
+      expect(
+        visionModels.any((m) => m.modelName == 'gemini-3.7-flash'),
+        isTrue,
+      );
       expect(visionModels.any((m) => m.modelName == 'glm-4v-flash'), isTrue);
       expect(visionModels.any((m) => m.modelName == 'glm-4.7-flash'), isFalse);
 
@@ -91,6 +113,21 @@ void main() {
     test(
       'CloudModelDatabase calculateEstimatedCost calculates USD costs correctly',
       () {
+        // gemini-3.7-flash: $1.50 / 1M input, $7.50 / 1M output
+        final cost37Flash = CloudModelDatabase.calculateEstimatedCost(
+          'gemini-3.7-flash',
+          inputTokens: 1000000,
+          outputTokens: 1000000,
+        );
+        expect(cost37Flash, closeTo(9.00, 0.0001));
+
+        final cost37FlashPartial = CloudModelDatabase.calculateEstimatedCost(
+          'gemini-3.7-flash',
+          inputTokens: 2000000,
+          outputTokens: 500000,
+        );
+        expect(cost37FlashPartial, closeTo(3.00 + 3.75, 0.0001));
+
         // gemini-3.6-flash: $1.50 / 1M input, $7.50 / 1M output
         final costFlash = CloudModelDatabase.calculateEstimatedCost(
           'gemini-3.6-flash',
