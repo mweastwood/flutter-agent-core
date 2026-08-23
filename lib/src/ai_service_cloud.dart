@@ -118,9 +118,11 @@ class CloudAiService extends AiService {
           body: body,
         );
 
+        lastResponse = response;
+        lastError = null;
+        lastStackTrace = null;
+
         if (response.statusCode == 200) {
-          lastResponse = response;
-          lastError = null;
           break;
         }
 
@@ -130,7 +132,8 @@ class CloudAiService extends AiService {
         );
 
         // Check if retryable status code: 429 (Rate Limit), 500, 502, 503, 504 (Server Errors)
-        final isRetryable = response.statusCode == 429 ||
+        final isRetryable =
+            response.statusCode == 429 ||
             response.statusCode == 500 ||
             response.statusCode == 502 ||
             response.statusCode == 503 ||
@@ -159,7 +162,9 @@ class CloudAiService extends AiService {
     }
 
     if (lastError != null) {
-      debugPrint('Error in CloudAiService post request: $lastError\n$lastStackTrace');
+      debugPrint(
+        'Error in CloudAiService post request: $lastError\n$lastStackTrace',
+      );
       return AiResponse(
         text: '{"error": "${lastError.toString().replaceAll('"', '\\"')}"}',
         isTruncated: false,
