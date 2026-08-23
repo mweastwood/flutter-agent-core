@@ -104,23 +104,29 @@ String cleanContinuationChunk(String chunk) {
 
 @visibleForTesting
 String stitchContinuation(String text, String nextText) {
-  for (var offset = 0; offset < 50; offset++) {
-    if (text.length <= offset) break;
-    final subText = offset == 0
-        ? text
-        : text.substring(0, text.length - offset);
+  final textLen = text.length;
+  final nextLen = nextText.length;
 
-    var maxOverlap = subText.length < nextText.length
-        ? subText.length
-        : nextText.length;
+  for (var offset = 0; offset < 50; offset++) {
+    if (textLen <= offset) break;
+    final subTextLen = textLen - offset;
+
+    var maxOverlap = subTextLen < nextLen ? subTextLen : nextLen;
     if (maxOverlap > 500) {
       maxOverlap = 500;
     }
     for (var i = maxOverlap; i >= 3; i--) {
-      final suffix = subText.substring(subText.length - i);
-      final prefix = nextText.substring(0, i);
-      if (suffix == prefix) {
-        return subText + nextText.substring(i);
+      final textStart = subTextLen - i;
+      var match = true;
+      for (var k = 0; k < i; k++) {
+        if (text.codeUnitAt(textStart + k) != nextText.codeUnitAt(k)) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        final prefixPart = offset == 0 ? text : text.substring(0, subTextLen);
+        return prefixPart + nextText.substring(i);
       }
     }
   }
