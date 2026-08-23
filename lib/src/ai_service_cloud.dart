@@ -106,23 +106,86 @@ class CloudAiService extends AiService {
       'max_tokens': ?maxOutputTokens,
     });
 
-    try {
-      final response = await _httpClient.post(
-        url,
-        headers: headers,
-        body: body,
-      );
-      if (response.statusCode != 200) {
-        debugPrint(
-          'CloudAiService error response: ${response.statusCode} - ${response.body}',
-        );
-        return AiResponse(
-          text: '{"error": "Server returned code ${response.statusCode}"}',
-          isTruncated: false,
-        );
-      }
+    dynamic lastError;
+    StackTrace? lastStackTrace;
+    http.Response? lastResponse;
 
-      final data = jsonDecode(response.body);
+    for (int attempt = 1; attempt <= 4; attempt++) {
+      try {
+        final response = await _httpClient.post(
+          url,
+          headers: headers,
+          body: body,
+        );
+
+        lastResponse = response;
+        lastError = null;
+        lastStackTrace = null;
+
+        if (response.statusCode == 200) {
+          break;
+        }
+
+        lastResponse = response;
+        debugPrint(
+          'CloudAiService response status ${response.statusCode} (attempt $attempt/4): ${response.body}',
+        );
+
+        // Check if retryable status code: 429 (Rate Limit), 500, 502, 503, 504 (Server Errors)
+        final isRetryable =
+            response.statusCode == 429 ||
+            response.statusCode == 500 ||
+            response.statusCode == 502 ||
+            response.statusCode == 503 ||
+            response.statusCode == 504;
+
+        if (!isRetryable || attempt == 4) {
+          break;
+        }
+
+        final backoffMs = attempt * 500;
+        await Future.delayed(Duration(milliseconds: backoffMs));
+      } catch (e, stack) {
+        lastError = e;
+        lastStackTrace = stack;
+        debugPrint(
+          'Error in CloudAiService post request (attempt $attempt/4): $e',
+        );
+
+        if (attempt == 4) {
+          break;
+        }
+
+        final backoffMs = attempt * 500;
+        await Future.delayed(Duration(milliseconds: backoffMs));
+      }
+    }
+
+    if (lastError != null) {
+      debugPrint(
+        'Error in CloudAiService post request: $lastError\n$lastStackTrace',
+      );
+      return AiResponse(
+        text: '{"error": "${lastError.toString().replaceAll('"', '\\"')}"}',
+        isTruncated: false,
+        isError: true,
+      );
+    }
+
+    if (lastResponse == null || lastResponse.statusCode != 200) {
+      final statusCode = lastResponse?.statusCode ?? 500;
+      debugPrint(
+        'CloudAiService error response: $statusCode - ${lastResponse?.body}',
+      );
+      return AiResponse(
+        text: '{"error": "Server returned code $statusCode"}',
+        isTruncated: false,
+        isError: true,
+      );
+    }
+
+    try {
+      final data = jsonDecode(lastResponse.body);
       final choice = data['choices']?[0];
       final text = choice?['message']?['content'] as String?;
       final finishReason = choice?['finish_reason'] as String?;
@@ -154,16 +217,18 @@ class CloudAiService extends AiService {
       return AiResponse(
         text: text,
         isTruncated: isTruncated,
+        isError: false,
         inputTokens: inputTokens,
         outputTokens: outputTokens,
         totalTokens: totalTokens,
         estimatedCostUsd: estimatedCost,
       );
     } catch (e, stack) {
-      debugPrint('Error in CloudAiService post request: $e\n$stack');
+      debugPrint('Error decoding CloudAiService response body: $e\n$stack');
       return AiResponse(
         text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
         isTruncated: false,
+        isError: true,
       );
     }
   }

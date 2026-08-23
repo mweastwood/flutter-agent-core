@@ -409,9 +409,27 @@ void main() {
       expect(response?.isTruncated, isTrue);
     });
 
-    test('handles server errors gracefully by returning error JSON', () async {
+    test('retries on 503 and succeeds on subsequent attempt', () async {
+      int attempts = 0;
       final mockClient = MockHttpClient((request) async {
-        return http.Response('Internal Server Error', 500);
+        attempts++;
+        if (attempts < 3) {
+          return http.Response('Service Unavailable', 503);
+        }
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'role': 'assistant',
+                  'content': 'success after retry',
+                },
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+          200,
+        );
       });
 
       final service = CloudAiService(
@@ -422,15 +440,65 @@ void main() {
       );
 
       final response = await service.generateContentRaw(prompt: 'hello world');
-      expect(response?.text, contains('error'));
-      expect(response?.text, contains('Server returned code 500'));
-      expect(response?.isTruncated, isFalse);
+      expect(attempts, equals(3));
+      expect(response?.text, equals('success after retry'));
+      expect(response?.isError, isFalse);
     });
 
     test(
-      'handles client exception gracefully by returning exception details',
+      'handles server errors gracefully by returning error JSON with isError: true',
       () async {
+        int attempts = 0;
         final mockClient = MockHttpClient((request) async {
+          attempts++;
+          return http.Response('Internal Server Error', 500);
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final response = await service.generateContentRaw(
+          prompt: 'hello world',
+        );
+        expect(attempts, equals(4));
+        expect(response?.text, contains('error'));
+        expect(response?.text, contains('Server returned code 500'));
+        expect(response?.isTruncated, isFalse);
+        expect(response?.isError, isTrue);
+      },
+    );
+
+    test('does not retry non-retryable 400 Bad Request errors', () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        return http.Response('Bad Request', 400);
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        httpClient: mockClient,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(attempts, equals(1));
+      expect(response?.text, contains('error'));
+      expect(response?.text, contains('Server returned code 400'));
+      expect(response?.isError, isTrue);
+    });
+
+    test(
+      'handles client exception gracefully by returning exception details with isError: true',
+      () async {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
           throw Exception('Connection failed');
         });
 
@@ -444,9 +512,40 @@ void main() {
         final response = await service.generateContentRaw(
           prompt: 'hello world',
         );
+        expect(attempts, equals(4));
         expect(response?.text, contains('error'));
         expect(response?.text, contains('Connection failed'));
         expect(response?.isTruncated, isFalse);
+        expect(response?.isError, isTrue);
+      },
+    );
+
+    test(
+      'clears stale exception when subsequent retry receives HTTP error response',
+      () async {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
+          if (attempts == 1) {
+            throw Exception('Network connection dropped');
+          }
+          return http.Response('Bad Request', 400);
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final response = await service.generateContentRaw(
+          prompt: 'hello world',
+        );
+        expect(attempts, equals(2));
+        expect(response?.text, contains('Server returned code 400'));
+        expect(response?.text, isNot(contains('Network connection dropped')));
+        expect(response?.isError, isTrue);
       },
     );
 

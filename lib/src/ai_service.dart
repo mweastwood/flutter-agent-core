@@ -11,6 +11,7 @@ enum AiCoreStatus { unavailable, downloadable, downloading, available }
 class AiResponse {
   final String text;
   final bool isTruncated;
+  final bool isError;
   final int? inputTokens;
   final int? outputTokens;
   final int? totalTokens;
@@ -19,6 +20,7 @@ class AiResponse {
   AiResponse({
     required this.text,
     this.isTruncated = false,
+    this.isError = false,
     this.inputTokens,
     this.outputTokens,
     int? totalTokens,
@@ -359,6 +361,7 @@ class MethodChannelAiService extends AiService {
           return AiResponse(
             text: '{"error": "${lastError.toString().replaceAll('"', '\\"')}"}',
             isTruncated: false,
+            isError: true,
           );
         }
         return null;
@@ -374,13 +377,14 @@ class MethodChannelAiService extends AiService {
       }
 
       if (text == null) return null;
-      return AiResponse(text: text, isTruncated: isTruncated);
+      return AiResponse(text: text, isTruncated: isTruncated, isError: false);
     } catch (e, stack) {
       debugPrint('Error generating content via MethodChannel: $e');
       debugPrint(stack.toString());
       return AiResponse(
         text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
         isTruncated: false,
+        isError: true,
       );
     }
   }
