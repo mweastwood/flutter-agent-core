@@ -1,5 +1,7 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
 import 'model_database.dart';
 
 class RateLimiter {
@@ -47,18 +49,16 @@ class RateLimiter {
 
     if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
       final double effectiveRps = modelInfo.limitRps! * pctFactor;
-      if (effectiveRps > 0) {
-        final requiredInterval = Duration(
-          milliseconds: (1000 / effectiveRps).round(),
-        );
-        if (_requestTimestamps.isNotEmpty) {
-          final lastRequestTime = _requestTimestamps.last;
-          final elapsed = now.difference(lastRequestTime);
-          if (elapsed < requiredInterval) {
-            final waitDuration = requiredInterval - elapsed;
-            if (waitDuration > Duration.zero) {
-              await Future.delayed(waitDuration);
-            }
+      final requiredInterval = Duration(
+        milliseconds: (1000 / effectiveRps).round(),
+      );
+      if (_requestTimestamps.isNotEmpty) {
+        final lastRequestTime = _requestTimestamps.last;
+        final elapsed = now.difference(lastRequestTime);
+        if (elapsed < requiredInterval) {
+          final waitDuration = requiredInterval - elapsed;
+          if (waitDuration > Duration.zero) {
+            await Future.delayed(waitDuration);
           }
         }
       }
@@ -66,55 +66,49 @@ class RateLimiter {
 
     if (modelInfo.limitRpm != null && modelInfo.limitRpm! > 0) {
       final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
-      if (effectiveRpm > 0) {
-        while (true) {
-          final checkTime = DateTime.now();
-          _requestTimestamps.removeWhere(
-            (dt) => checkTime.difference(dt) > const Duration(minutes: 1),
-          );
-          if (_requestTimestamps.length < effectiveRpm) {
-            break;
-          }
-          if (_requestTimestamps.isEmpty) break;
-          final oldestInWindow = _requestTimestamps.first;
-          final waitDuration =
-              const Duration(minutes: 1) -
-              checkTime.difference(oldestInWindow) +
-              const Duration(milliseconds: 100);
-          if (waitDuration > Duration.zero) {
-            await Future.delayed(waitDuration);
-          }
+      while (true) {
+        final checkTime = DateTime.now();
+        _requestTimestamps.removeWhere(
+          (dt) => checkTime.difference(dt) > const Duration(minutes: 1),
+        );
+        if (_requestTimestamps.length < effectiveRpm) {
+          break;
+        }
+        final oldestInWindow = _requestTimestamps.first;
+        final waitDuration =
+            const Duration(minutes: 1) -
+            checkTime.difference(oldestInWindow) +
+            const Duration(milliseconds: 100);
+        if (waitDuration > Duration.zero) {
+          await Future.delayed(waitDuration);
         }
       }
     }
 
     if (modelInfo.limitTpm != null && modelInfo.limitTpm! > 0) {
       final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
-      if (effectiveTpm > 0) {
-        while (true) {
-          final checkTime = DateTime.now();
-          _tokenUsage.removeWhere(
-            (item) =>
-                checkTime.difference(item.timestamp) >
-                const Duration(minutes: 1),
-          );
-          final recentTokens = _tokenUsage.fold<int>(
-            0,
-            (sum, item) => sum + item.tokenCount,
-          );
+      while (true) {
+        final checkTime = DateTime.now();
+        _tokenUsage.removeWhere(
+          (item) =>
+              checkTime.difference(item.timestamp) > const Duration(minutes: 1),
+        );
+        final recentTokens = _tokenUsage.fold<int>(
+          0,
+          (sum, item) => sum + item.tokenCount,
+        );
 
-          if (recentTokens + estimatedTokens <= effectiveTpm) {
-            break;
-          }
-          if (_tokenUsage.isEmpty) break;
-          final oldestInWindow = _tokenUsage.first;
-          final waitDuration =
-              const Duration(minutes: 1) -
-              checkTime.difference(oldestInWindow.timestamp) +
-              const Duration(milliseconds: 100);
-          if (waitDuration > Duration.zero) {
-            await Future.delayed(waitDuration);
-          }
+        if (recentTokens + estimatedTokens <= effectiveTpm) {
+          break;
+        }
+        if (_tokenUsage.isEmpty) break;
+        final oldestInWindow = _tokenUsage.first;
+        final waitDuration =
+            const Duration(minutes: 1) -
+            checkTime.difference(oldestInWindow.timestamp) +
+            const Duration(milliseconds: 100);
+        if (waitDuration > Duration.zero) {
+          await Future.delayed(waitDuration);
         }
       }
     }
