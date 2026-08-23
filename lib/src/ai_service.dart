@@ -37,6 +37,7 @@ class AiResponse {
                ? inputTokens + outputTokens
                : null);
 }
+
 abstract class AiService {
   Future<AiCoreStatus> checkStatus();
   Future<void> triggerDownload();
