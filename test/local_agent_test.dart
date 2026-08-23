@@ -300,6 +300,79 @@ void main() {
         expect(countWithImage, equals(259)); // 3 + 256
       },
     );
+
+    test(
+      'returns error response immediately if initial completion has isError: true',
+      () async {
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'test prompt',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            return AiResponse(
+              text: '{"error": "Initial request failed"}',
+              isError: true,
+            );
+          },
+        );
+        expect(result, equals('{"error": "Initial request failed"}'));
+      },
+    );
+
+    test(
+      'breaks and avoids stitching continuation error response when continuation returns isError: true',
+      () async {
+        var callCount = 0;
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'test prompt',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            callCount++;
+            if (callCount == 1) {
+              return AiResponse(
+                text: 'Partial response that is truncated',
+                isTruncated: true,
+                isError: false,
+              );
+            }
+            return AiResponse(
+              text: '{"error": "Server returned code 503"}',
+              isTruncated: false,
+              isError: true,
+            );
+          },
+        );
+        expect(callCount, equals(2));
+        expect(result, equals('Partial response that is truncated'));
+      },
+    );
+
+    test(
+      'breaks and repairs JSON without error JSON when continuation returns isError: true on truncated JSON',
+      () async {
+        var callCount = 0;
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'generate json',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            callCount++;
+            if (callCount == 1) {
+              return AiResponse(
+                text: '{"items": ["item1"',
+                isTruncated: true,
+                isError: false,
+              );
+            }
+            return AiResponse(
+              text: '{"error": "Rate limit reached"}',
+              isTruncated: false,
+              isError: true,
+            );
+          },
+        );
+        expect(callCount, equals(2));
+        expect(result, equals('{"items": ["item1"]}'));
+      },
+    );
   });
 
   group('CloudAiService Tests', () {
