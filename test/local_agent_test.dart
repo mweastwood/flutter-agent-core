@@ -549,41 +549,47 @@ void main() {
       },
     );
 
-    test('returns null gracefully on empty choices array in 200 response', () async {
-      final mockClient = MockHttpClient((request) async {
-        return http.Response(jsonEncode({'choices': []}), 200);
-      });
-      final service = CloudAiService(
-        baseUrl: 'https://api.gemini.com/v1',
-        apiKey: 'test-key',
-        modelName: 'gemini-1.5-flash',
-        httpClient: mockClient,
-      );
+    test(
+      'returns null gracefully on empty choices array in 200 response',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(jsonEncode({'choices': []}), 200);
+        });
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
 
-      final rawRes = await service.generateContentRaw(prompt: 'test');
-      expect(rawRes, isNull);
+        final rawRes = await service.generateContentRaw(prompt: 'test');
+        expect(rawRes, isNull);
 
-      final res = await service.generateContent(prompt: 'test');
-      expect(res, isNull);
-    });
+        final res = await service.generateContent(prompt: 'test');
+        expect(res, isNull);
+      },
+    );
 
-    test('returns null gracefully on missing or null choices in 200 response', () async {
-      final mockClient = MockHttpClient((request) async {
-        return http.Response(jsonEncode({'choices': null}), 200);
-      });
-      final service = CloudAiService(
-        baseUrl: 'https://api.gemini.com/v1',
-        apiKey: 'test-key',
-        modelName: 'gemini-1.5-flash',
-        httpClient: mockClient,
-      );
+    test(
+      'returns null gracefully on missing or null choices in 200 response',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(jsonEncode({'choices': null}), 200);
+        });
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
 
-      final rawRes = await service.generateContentRaw(prompt: 'test');
-      expect(rawRes, isNull);
+        final rawRes = await service.generateContentRaw(prompt: 'test');
+        expect(rawRes, isNull);
 
-      final res = await service.generateContent(prompt: 'test');
-      expect(res, isNull);
-    });
+        final res = await service.generateContent(prompt: 'test');
+        expect(res, isNull);
+      },
+    );
 
     test('countTokens calculates local estimate', () async {
       final service = CloudAiService(
