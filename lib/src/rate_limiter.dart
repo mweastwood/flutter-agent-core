@@ -52,9 +52,7 @@ class RateLimiter {
       if (effectiveRps > 0) {
         final double intervalMs = 1000 / effectiveRps;
         if (intervalMs.isFinite && intervalMs <= 86400000) {
-          final requiredInterval = Duration(
-            milliseconds: intervalMs.round(),
-          );
+          final requiredInterval = Duration(milliseconds: intervalMs.round());
           if (_requestTimestamps.isNotEmpty) {
             final lastRequestTime = _requestTimestamps.last;
             final elapsed = now.difference(lastRequestTime);

@@ -311,7 +311,8 @@ void main() {
 
         final limiter = RateLimiter(
           modelInfo: mockInfo,
-          throttlePercentage: 25.0, // 0.25 RPS -> 4000ms interval, 1.25 RPM, 12.5 TPM
+          throttlePercentage:
+              25.0, // 0.25 RPS -> 4000ms interval, 1.25 RPM, 12.5 TPM
         );
 
         final stopwatch = Stopwatch()..start();
