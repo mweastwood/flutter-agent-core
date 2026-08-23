@@ -300,6 +300,79 @@ void main() {
         expect(countWithImage, equals(259)); // 3 + 256
       },
     );
+
+    test(
+      'returns error response immediately if initial completion has isError: true',
+      () async {
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'test prompt',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            return AiResponse(
+              text: '{"error": "Initial request failed"}',
+              isError: true,
+            );
+          },
+        );
+        expect(result, equals('{"error": "Initial request failed"}'));
+      },
+    );
+
+    test(
+      'breaks and avoids stitching continuation error response when continuation returns isError: true',
+      () async {
+        var callCount = 0;
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'test prompt',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            callCount++;
+            if (callCount == 1) {
+              return AiResponse(
+                text: 'Partial response that is truncated',
+                isTruncated: true,
+                isError: false,
+              );
+            }
+            return AiResponse(
+              text: '{"error": "Server returned code 503"}',
+              isTruncated: false,
+              isError: true,
+            );
+          },
+        );
+        expect(callCount, equals(2));
+        expect(result, equals('Partial response that is truncated'));
+      },
+    );
+
+    test(
+      'breaks and repairs JSON without error JSON when continuation returns isError: true on truncated JSON',
+      () async {
+        var callCount = 0;
+        final result = await runWithAutoContinuation(
+          initialPrompt: 'generate json',
+          autoContinueLimit: 3,
+          runCompletion: (prompt) async {
+            callCount++;
+            if (callCount == 1) {
+              return AiResponse(
+                text: '{"items": ["item1"',
+                isTruncated: true,
+                isError: false,
+              );
+            }
+            return AiResponse(
+              text: '{"error": "Rate limit reached"}',
+              isTruncated: false,
+              isError: true,
+            );
+          },
+        );
+        expect(callCount, equals(2));
+        expect(result, equals('{"items": ["item1"]}'));
+      },
+    );
   });
 
   group('CloudAiService Tests', () {
@@ -793,6 +866,37 @@ void main() {
 
       // Brackets/braces characters inside JSON string
       expect(repairJson('{"test": "}"}'), equals('{"test": "}"}'));
+
+      // Truncated string literal inside an object (Issue #33)
+      final truncatedObj =
+          '{"title": "Bug Report", "content": "Incomplete string';
+      final repairedObj = repairJson(truncatedObj);
+      expect(
+        repairedObj,
+        equals('{"title": "Bug Report", "content": "Incomplete string"}'),
+      );
+      expect(
+        jsonDecode(repairedObj),
+        equals({'title': 'Bug Report', 'content': 'Incomplete string'}),
+      );
+
+      // Truncated string literal containing nested structural characters
+      final truncatedStructural = '{"msg": "Hello { world';
+      final repairedStructural = repairJson(truncatedStructural);
+      expect(repairedStructural, equals('{"msg": "Hello { world"}'));
+      expect(jsonDecode(repairedStructural), equals({'msg': 'Hello { world'}));
+
+      // Truncated string literal with trailing backslash / escaped character
+      final truncatedEscape = r'{"path": "C:\\folder\';
+      final repairedEscape = repairJson(truncatedEscape);
+      expect(repairedEscape, equals(r'{"path": "C:\\folder\\"}'));
+      expect(jsonDecode(repairedEscape), equals({'path': r'C:\folder\'}));
+
+      // Truncated string in array
+      final truncatedArr = '["item1", "item2 unclosed';
+      final repairedArr = repairJson(truncatedArr);
+      expect(repairedArr, equals('["item1", "item2 unclosed"]'));
+      expect(jsonDecode(repairedArr), equals(['item1', 'item2 unclosed']));
     });
   });
 }
