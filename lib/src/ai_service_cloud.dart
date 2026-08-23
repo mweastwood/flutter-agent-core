@@ -186,7 +186,10 @@ class CloudAiService extends AiService {
 
     try {
       final data = jsonDecode(lastResponse.body);
-      final choice = data['choices']?[0];
+      final choices = data['choices'] as List?;
+      final choice = (choices != null && choices.isNotEmpty)
+          ? choices.first as Map<String, dynamic>?
+          : null;
       final text = choice?['message']?['content'] as String?;
       final finishReason = choice?['finish_reason'] as String?;
       final isTruncated = finishReason == 'length';
