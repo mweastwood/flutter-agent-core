@@ -49,16 +49,21 @@ class RateLimiter {
 
     if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
       final double effectiveRps = modelInfo.limitRps! * pctFactor;
-      final requiredInterval = Duration(
-        milliseconds: (1000 / effectiveRps).round(),
-      );
-      if (_requestTimestamps.isNotEmpty) {
-        final lastRequestTime = _requestTimestamps.last;
-        final elapsed = now.difference(lastRequestTime);
-        if (elapsed < requiredInterval) {
-          final waitDuration = requiredInterval - elapsed;
-          if (waitDuration > Duration.zero) {
-            await Future.delayed(waitDuration);
+      if (effectiveRps > 0) {
+        final double intervalMs = 1000 / effectiveRps;
+        if (intervalMs.isFinite && intervalMs <= 86400000) {
+          final requiredInterval = Duration(
+            milliseconds: intervalMs.round(),
+          );
+          if (_requestTimestamps.isNotEmpty) {
+            final lastRequestTime = _requestTimestamps.last;
+            final elapsed = now.difference(lastRequestTime);
+            if (elapsed < requiredInterval) {
+              final waitDuration = requiredInterval - elapsed;
+              if (waitDuration > Duration.zero) {
+                await Future.delayed(waitDuration);
+              }
+            }
           }
         }
       }
@@ -74,6 +79,7 @@ class RateLimiter {
         if (_requestTimestamps.length < effectiveRpm) {
           break;
         }
+        if (_requestTimestamps.isEmpty) break;
         final oldestInWindow = _requestTimestamps.first;
         final waitDuration =
             const Duration(minutes: 1) -

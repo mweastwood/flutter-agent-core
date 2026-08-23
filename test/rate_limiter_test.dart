@@ -243,5 +243,85 @@ void main() {
         expect(stopwatch.elapsedMilliseconds, lessThan(50));
       },
     );
+
+    test(
+      'RateLimiter handles near-zero or underflow throttlePercentage in RPS without division-by-zero or infinity exceptions',
+      () async {
+        final mockInfo = CloudModelInfo(
+          modelName: 'test-underflow-rps-model',
+          provider: CloudProvider.gemini,
+          limitRps: 10,
+          description: 'Test limit',
+        );
+
+        final limiter = RateLimiter(
+          modelInfo: mockInfo,
+          throttlePercentage: 1e-320, // results in effectiveRps == 0.0
+        );
+
+        final stopwatch = Stopwatch()..start();
+        await limiter.throttleBeforeRequest(10);
+        await limiter.throttleBeforeRequest(10);
+        stopwatch.stop();
+
+        expect(stopwatch.elapsedMilliseconds, lessThan(50));
+      },
+    );
+
+    test(
+      'RateLimiter handles expired RPM window with active RPM limit without StateError',
+      () async {
+        final mockInfo = CloudModelInfo(
+          modelName: 'test-expired-rpm-model',
+          provider: CloudProvider.gemini,
+          limitRpm: 1,
+          description: 'Test expired RPM window',
+        );
+
+        final limiter = RateLimiter(
+          modelInfo: mockInfo,
+          throttlePercentage: 100.0,
+        );
+
+        // Add expired request timestamp older than 1 minute
+        final expiredTimestamp = DateTime.now().subtract(
+          const Duration(minutes: 2),
+        );
+        limiter.recordRequestForTesting(expiredTimestamp);
+
+        final stopwatch = Stopwatch()..start();
+        await limiter.throttleBeforeRequest(10);
+        stopwatch.stop();
+
+        expect(stopwatch.elapsedMilliseconds, lessThan(50));
+      },
+    );
+
+    test(
+      'RateLimiter handles fractional effective limits for RPS, RPM, and TPM',
+      () async {
+        final mockInfo = CloudModelInfo(
+          modelName: 'test-fractional-model',
+          provider: CloudProvider.gemini,
+          limitRps: 1,
+          limitRpm: 5,
+          limitTpm: 50,
+          description: 'Test fractional limits',
+        );
+
+        final limiter = RateLimiter(
+          modelInfo: mockInfo,
+          throttlePercentage: 25.0, // 0.25 RPS -> 4000ms interval, 1.25 RPM, 12.5 TPM
+        );
+
+        final stopwatch = Stopwatch()..start();
+        await limiter.throttleBeforeRequest(5);
+        stopwatch.stop();
+
+        expect(stopwatch.elapsedMilliseconds, lessThan(50));
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(limiter.tokenUsage.length, equals(1));
+      },
+    );
   });
 }
