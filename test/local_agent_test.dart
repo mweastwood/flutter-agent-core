@@ -676,6 +676,18 @@ void main() {
         stitchContinuation(longStr, 'a' * 600 + 'b'),
         equals('a' * 700 + 'b'),
       );
+
+      // Edge case: Empty or short strings
+      expect(stitchContinuation('', 'abc'), equals('abc'));
+      expect(stitchContinuation('abc', ''), equals('abc'));
+      expect(stitchContinuation('ab', 'ab'), equals('abab'));
+      expect(stitchContinuation('abc', 'abc'), equals('abc'));
+
+      // Non-zero offset overlap matching
+      expect(
+        stitchContinuation('prefix-overlap-12345extra', 'overlap-12345suffix'),
+        equals('prefix-overlap-12345suffix'),
+      );
     });
 
     test('repairJson structural balancing', () {
