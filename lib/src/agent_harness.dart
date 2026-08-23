@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'ai_service.dart';
+import 'json_utils.dart';
 
 abstract class AgentDelegate<T> {
   /// Formats the prompt for the next step, incorporating loop history.
@@ -54,17 +55,7 @@ class AgentHarness<T> {
       }
 
       // Parse JSON from response (clean markdown if present)
-      var cleanedString = responseText.trim();
-      if (cleanedString.startsWith('```')) {
-        final lines = cleanedString.split('\n');
-        if (lines.first.startsWith('```')) {
-          lines.removeAt(0);
-        }
-        if (lines.isNotEmpty && lines.last.startsWith('```')) {
-          lines.removeLast();
-        }
-        cleanedString = lines.join('\n').trim();
-      }
+      final cleanedString = stripMarkdownCodeFences(responseText);
 
       Map<String, dynamic> parsed;
       try {
