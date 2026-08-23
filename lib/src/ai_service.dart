@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ai_service_stub.dart' if (dart.library.html) 'ai_service_web.dart';
+import 'json_utils.dart';
 
 enum AiCoreStatus { unavailable, downloadable, downloading, available }
 
@@ -70,21 +70,10 @@ bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
 String cleanContinuationChunk(String chunk) {
   var cleaned = chunk;
 
-  // Strip starting code fences
-  if (cleaned.trimLeft().startsWith('```')) {
-    final lines = cleaned.split('\n');
-    if (lines.isNotEmpty && lines.first.trim().startsWith('```')) {
-      lines.removeAt(0);
-    }
-    cleaned = lines.join('\n');
-  }
-
-  // Strip ending code fences
-  if (cleaned.trimRight().endsWith('```')) {
-    final idx = cleaned.lastIndexOf('```');
-    if (idx != -1) {
-      cleaned = cleaned.substring(0, idx);
-    }
+  // Strip code fences if present
+  if (cleaned.trimLeft().startsWith('```') ||
+      cleaned.trimRight().endsWith('```')) {
+    cleaned = stripMarkdownCodeFences(cleaned);
   }
 
   // Strip leading and trailing newlines (preserving spaces)
@@ -573,17 +562,6 @@ extension AiServiceJsonExtension on AiService {
     );
     if (raw == null) return null;
 
-    var cleaned = raw.trim();
-    if (cleaned.startsWith('```')) {
-      final lines = cleaned.split('\n');
-      if (lines.first.startsWith('```')) lines.removeAt(0);
-      if (lines.isNotEmpty && lines.last.startsWith('```')) lines.removeLast();
-      cleaned = lines.join('\n').trim();
-    }
-    try {
-      return jsonDecode(cleaned);
-    } catch (_) {
-      return null;
-    }
+    return parseJsonWithFenceFallback(raw);
   }
 }
