@@ -878,6 +878,37 @@ void main() {
 
       // Brackets/braces characters inside JSON string
       expect(repairJson('{"test": "}"}'), equals('{"test": "}"}'));
+
+      // Truncated string literal inside an object (Issue #33)
+      final truncatedObj =
+          '{"title": "Bug Report", "content": "Incomplete string';
+      final repairedObj = repairJson(truncatedObj);
+      expect(
+        repairedObj,
+        equals('{"title": "Bug Report", "content": "Incomplete string"}'),
+      );
+      expect(
+        jsonDecode(repairedObj),
+        equals({'title': 'Bug Report', 'content': 'Incomplete string'}),
+      );
+
+      // Truncated string literal containing nested structural characters
+      final truncatedStructural = '{"msg": "Hello { world';
+      final repairedStructural = repairJson(truncatedStructural);
+      expect(repairedStructural, equals('{"msg": "Hello { world"}'));
+      expect(jsonDecode(repairedStructural), equals({'msg': 'Hello { world'}));
+
+      // Truncated string literal with trailing backslash / escaped character
+      final truncatedEscape = r'{"path": "C:\\folder\';
+      final repairedEscape = repairJson(truncatedEscape);
+      expect(repairedEscape, equals(r'{"path": "C:\\folder\\"}'));
+      expect(jsonDecode(repairedEscape), equals({'path': r'C:\folder\'}));
+
+      // Truncated string in array
+      final truncatedArr = '["item1", "item2 unclosed';
+      final repairedArr = repairJson(truncatedArr);
+      expect(repairedArr, equals('["item1", "item2 unclosed"]'));
+      expect(jsonDecode(repairedArr), equals(['item1', 'item2 unclosed']));
     });
   });
 }

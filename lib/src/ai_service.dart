@@ -185,6 +185,13 @@ String repairJson(String json) {
     }
   }
 
+  if (escape) {
+    result.write(r'\');
+  }
+  if (inString) {
+    result.write('"');
+  }
+
   while (stack.isNotEmpty) {
     final open = stack.removeLast();
     if (open == '{') {
