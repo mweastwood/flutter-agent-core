@@ -209,6 +209,7 @@ Future<String?> runWithAutoContinuation({
 }) async {
   var response = await runCompletion(initialPrompt);
   if (response == null) return null;
+  if (response.isError) return response.text;
 
   var text = response.text;
   var isTruncated = isTruncatedHeuristic(text, response.isTruncated);
@@ -223,6 +224,7 @@ Future<String?> runWithAutoContinuation({
 
     final nextResponse = await runCompletion(continuationPrompt);
     if (nextResponse == null) break;
+    if (nextResponse.isError) break;
 
     final nextText = cleanContinuationChunk(nextResponse.text);
     text = stitchContinuation(text, nextText);
