@@ -31,9 +31,8 @@ class CloudAiService extends AiService {
     this.maxRetryDelay = const Duration(seconds: 15),
     this.enableJitter = true,
     http.Client? httpClient,
-    Random? random,
+    this._random,
   }) : _httpClient = httpClient ?? http.Client(),
-       _random = random,
        _rateLimiter = (() {
          final info = CloudModelDatabase.getModelInfo(modelName);
          return info != null
@@ -85,6 +84,10 @@ class CloudAiService extends AiService {
     final expFactor = 1 << (attempt - 1);
     final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
     final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
+
+    if (boundedMs == 0) {
+      return Duration.zero;
+    }
 
     if (!enableJitter) {
       return Duration(milliseconds: boundedMs);
