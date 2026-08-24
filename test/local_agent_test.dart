@@ -509,6 +509,7 @@ void main() {
         baseUrl: 'https://api.gemini.com/v1',
         apiKey: 'test-key',
         modelName: 'gemini-1.5-flash',
+        initialRetryDelay: Duration.zero,
         httpClient: mockClient,
       );
 
@@ -519,7 +520,7 @@ void main() {
     });
 
     test(
-      'handles server errors gracefully by returning error JSON with isError: true',
+      'handles server errors gracefully by returning error JSON with isError: true after all retries',
       () async {
         int attempts = 0;
         final mockClient = MockHttpClient((request) async {
@@ -531,13 +532,15 @@ void main() {
           baseUrl: 'https://api.gemini.com/v1',
           apiKey: 'test-key',
           modelName: 'gemini-1.5-flash',
+          maxRetries: 4,
+          initialRetryDelay: Duration.zero,
           httpClient: mockClient,
         );
 
         final response = await service.generateContentRaw(
           prompt: 'hello world',
         );
-        expect(attempts, equals(4));
+        expect(attempts, equals(5));
         expect(response?.text, contains('error'));
         expect(response?.text, contains('Server returned code 500'));
         expect(response?.isTruncated, isFalse);
@@ -556,6 +559,7 @@ void main() {
         baseUrl: 'https://api.gemini.com/v1',
         apiKey: 'test-key',
         modelName: 'gemini-1.5-flash',
+        initialRetryDelay: Duration.zero,
         httpClient: mockClient,
       );
 
@@ -567,7 +571,7 @@ void main() {
     });
 
     test(
-      'handles client exception gracefully by returning exception details with isError: true',
+      'handles client exception gracefully by returning exception details with isError: true after retries',
       () async {
         int attempts = 0;
         final mockClient = MockHttpClient((request) async {
@@ -579,6 +583,8 @@ void main() {
           baseUrl: 'https://api.gemini.com/v1',
           apiKey: 'test-key',
           modelName: 'gemini-1.5-flash',
+          maxRetries: 3,
+          initialRetryDelay: Duration.zero,
           httpClient: mockClient,
         );
 
@@ -609,6 +615,7 @@ void main() {
           baseUrl: 'https://api.gemini.com/v1',
           apiKey: 'test-key',
           modelName: 'gemini-1.5-flash',
+          initialRetryDelay: Duration.zero,
           httpClient: mockClient,
         );
 
@@ -621,6 +628,44 @@ void main() {
         expect(response?.isError, isTrue);
       },
     );
+
+    test('honors Retry-After header on 503 or 429 response', () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        if (attempts == 1) {
+          return http.Response(
+            'Rate limit exceeded',
+            429,
+            headers: {'retry-after': '1'},
+          );
+        }
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': 'after rate limit'},
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(attempts, equals(2));
+      expect(response?.text, equals('after rate limit'));
+      expect(response?.isError, isFalse);
+    });
 
     test(
       'returns null gracefully on empty choices array in 200 response',

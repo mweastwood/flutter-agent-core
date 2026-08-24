@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'ai_service.dart';
@@ -12,16 +13,27 @@ class CloudAiService extends AiService {
   final String apiKey;
   final String modelName;
   final double throttlePercentage;
+  final int maxRetries;
+  final Duration initialRetryDelay;
+  final Duration maxRetryDelay;
+  final bool enableJitter;
   final http.Client _httpClient;
   final RateLimiter? _rateLimiter;
+  final Random? _random;
 
   CloudAiService({
     required this.baseUrl,
     required this.apiKey,
     required this.modelName,
     this.throttlePercentage = 100.0,
+    this.maxRetries = 4,
+    this.initialRetryDelay = const Duration(milliseconds: 1500),
+    this.maxRetryDelay = const Duration(seconds: 15),
+    this.enableJitter = true,
     http.Client? httpClient,
+    Random? random,
   }) : _httpClient = httpClient ?? http.Client(),
+       _random = random,
        _rateLimiter = (() {
          final info = CloudModelDatabase.getModelInfo(modelName);
          return info != null
@@ -57,6 +69,34 @@ class CloudAiService extends AiService {
       count += 256;
     }
     return count;
+  }
+
+  Duration _calculateBackoff(int attempt, http.Response? response) {
+    if (response != null && response.headers.containsKey('retry-after')) {
+      final retryAfterStr = response.headers['retry-after'];
+      if (retryAfterStr != null) {
+        final seconds = int.tryParse(retryAfterStr.trim());
+        if (seconds != null && seconds > 0) {
+          return Duration(seconds: seconds);
+        }
+      }
+    }
+
+    final expFactor = 1 << (attempt - 1);
+    final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
+    final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
+
+    if (!enableJitter) {
+      return Duration(milliseconds: boundedMs);
+    }
+
+    final random = _random ?? Random();
+    final jitterRange = min(1000, (boundedMs * 0.25).round());
+    final jitter = jitterRange > 0
+        ? (random.nextInt(jitterRange * 2) - jitterRange)
+        : 0;
+    final finalMs = max(100, boundedMs + jitter);
+    return Duration(milliseconds: finalMs);
   }
 
   @override
@@ -110,7 +150,9 @@ class CloudAiService extends AiService {
     StackTrace? lastStackTrace;
     http.Response? lastResponse;
 
-    for (int attempt = 1; attempt <= 4; attempt++) {
+    final totalAttempts = maxRetries > 0 ? maxRetries + 1 : 1;
+
+    for (int attempt = 1; attempt <= totalAttempts; attempt++) {
       try {
         final response = await _httpClient.post(
           url,
@@ -126,9 +168,8 @@ class CloudAiService extends AiService {
           break;
         }
 
-        lastResponse = response;
         debugPrint(
-          'CloudAiService response status ${response.statusCode} (attempt $attempt/4): ${response.body}',
+          'CloudAiService response status ${response.statusCode} (attempt $attempt/$totalAttempts): ${response.body}',
         );
 
         // Check if retryable status code: 429 (Rate Limit), 500, 502, 503, 504 (Server Errors)
@@ -139,25 +180,25 @@ class CloudAiService extends AiService {
             response.statusCode == 503 ||
             response.statusCode == 504;
 
-        if (!isRetryable || attempt == 4) {
+        if (!isRetryable || attempt == totalAttempts) {
           break;
         }
 
-        final backoffMs = attempt * 500;
-        await Future.delayed(Duration(milliseconds: backoffMs));
+        final backoff = _calculateBackoff(attempt, response);
+        await Future.delayed(backoff);
       } catch (e, stack) {
         lastError = e;
         lastStackTrace = stack;
         debugPrint(
-          'Error in CloudAiService post request (attempt $attempt/4): $e',
+          'Error in CloudAiService post request (attempt $attempt/$totalAttempts): $e',
         );
 
-        if (attempt == 4) {
+        if (attempt == totalAttempts) {
           break;
         }
 
-        final backoffMs = attempt * 500;
-        await Future.delayed(Duration(milliseconds: backoffMs));
+        final backoff = _calculateBackoff(attempt, null);
+        await Future.delayed(backoff);
       }
     }
 
