@@ -70,9 +70,19 @@ class CloudAiService extends AiService {
     return count;
   }
 
+  @visibleForTesting
+  Duration calculateBackoff(int attempt, http.Response? response) =>
+      _calculateBackoff(attempt, response);
+
   Duration _calculateBackoff(int attempt, http.Response? response) {
-    if (response != null && response.headers.containsKey('retry-after')) {
-      final retryAfterStr = response.headers['retry-after'];
+    if (response != null) {
+      String? retryAfterStr;
+      for (final entry in response.headers.entries) {
+        if (entry.key.toLowerCase() == 'retry-after') {
+          retryAfterStr = entry.value;
+          break;
+        }
+      }
       if (retryAfterStr != null) {
         final seconds = int.tryParse(retryAfterStr.trim());
         if (seconds != null && seconds > 0) {
@@ -81,7 +91,7 @@ class CloudAiService extends AiService {
       }
     }
 
-    final expFactor = 1 << (attempt - 1);
+    final expFactor = 1 << (attempt - 1).clamp(0, 30);
     final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
     final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
 
@@ -98,7 +108,7 @@ class CloudAiService extends AiService {
     final jitter = jitterRange > 0
         ? (random.nextInt(jitterRange * 2) - jitterRange)
         : 0;
-    final finalMs = max(100, boundedMs + jitter);
+    final finalMs = max(1, boundedMs + jitter);
     return Duration(milliseconds: finalMs);
   }
 

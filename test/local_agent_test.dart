@@ -668,6 +668,87 @@ void main() {
     });
 
     test(
+      'handles case-insensitive Retry-After header variations in calculateBackoff',
+      () {
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+        );
+
+        final pascalResponse = http.Response(
+          'Too Many Requests',
+          429,
+          headers: {'Retry-After': '5'},
+        );
+        expect(
+          service.calculateBackoff(1, pascalResponse),
+          equals(const Duration(seconds: 5)),
+        );
+
+        final upperResponse = http.Response(
+          'Service Unavailable',
+          503,
+          headers: {'RETRY-AFTER': '12'},
+        );
+        expect(
+          service.calculateBackoff(1, upperResponse),
+          equals(const Duration(seconds: 12)),
+        );
+
+        final lowerResponse = http.Response(
+          'Service Unavailable',
+          503,
+          headers: {'retry-after': '3'},
+        );
+        expect(
+          service.calculateBackoff(1, lowerResponse),
+          equals(const Duration(seconds: 3)),
+        );
+      },
+    );
+
+    test('prevents bit-shift overflow for large retry attempt counts', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 30),
+        enableJitter: false,
+      );
+
+      expect(
+        service.calculateBackoff(65, null),
+        equals(const Duration(seconds: 30)),
+      );
+      expect(
+        service.calculateBackoff(100, null),
+        equals(const Duration(seconds: 30)),
+      );
+    });
+
+    test('preserves sub-100ms small retry delays when jitter is enabled', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        initialRetryDelay: const Duration(milliseconds: 50),
+        maxRetryDelay: const Duration(seconds: 5),
+        enableJitter: true,
+      );
+
+      for (int i = 0; i < 20; i++) {
+        final backoff = service.calculateBackoff(1, null);
+        expect(backoff.inMilliseconds, greaterThanOrEqualTo(1));
+        // 50ms with +/-25% jitter is between 37ms and 63ms, well below 100ms
+        expect(backoff.inMilliseconds, lessThan(100));
+        expect(backoff.inMilliseconds, greaterThanOrEqualTo(37));
+        expect(backoff.inMilliseconds, lessThanOrEqualTo(63));
+      }
+    });
+
+    test(
       'returns null gracefully on empty choices array in 200 response',
       () async {
         final mockClient = MockHttpClient((request) async {
