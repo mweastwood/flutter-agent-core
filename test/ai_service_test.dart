@@ -171,8 +171,10 @@ void main() {
       'generateContentRaw returns null when generateContent returns null',
       () async {
         final service = TestFakeAiService()..mockContent = null;
+        expect(service.generateContentCallCount, equals(0));
         final raw = await service.generateContentRaw(prompt: 'test');
         expect(raw, isNull);
+        expect(service.generateContentCallCount, equals(1));
       },
     );
 
@@ -180,6 +182,7 @@ void main() {
       'generateContentRaw wraps generateContent text in AiResponse and forwards imageBytes',
       () async {
         final service = TestFakeAiService()..mockContent = 'Hello world';
+        expect(service.generateContentCallCount, equals(0));
         final imageBytes = Uint8List.fromList([1, 2, 3]);
         final raw = await service.generateContentRaw(
           prompt: 'test prompt',
@@ -194,6 +197,7 @@ void main() {
         expect(service.capturedImageBytes, equals(imageBytes));
         expect(service.capturedTemperature, equals(0.8));
         expect(service.capturedMaxOutputTokens, equals(50));
+        expect(service.generateContentCallCount, equals(1));
       },
     );
   });
@@ -328,6 +332,45 @@ void main() {
       final service = container.read(aiServiceProvider);
       expect(service, isA<AiService>());
     });
+  });
+
+  group('MockAiService Tests', () {
+    test(
+      'triggerDownload with default delay transitions status to downloading when downloadable',
+      () async {
+        final service = MockAiService();
+        service.setMockStatus(AiCoreStatus.downloadable);
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
+
+        await service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+      },
+    );
+
+    test(
+      'triggerDownload with custom delay transitions status to downloading and then available',
+      () async {
+        final service = MockAiService();
+        service.setMockStatus(AiCoreStatus.downloadable);
+
+        await service.triggerDownload(delay: const Duration(milliseconds: 10));
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+
+        await Future.delayed(const Duration(milliseconds: 20));
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
+
+    test(
+      'triggerDownload does nothing when status is not downloadable',
+      () async {
+        final service = MockAiService();
+        service.setMockStatus(AiCoreStatus.available);
+
+        await service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
   });
 
   group('AiServiceContinuationExtension Tests', () {
