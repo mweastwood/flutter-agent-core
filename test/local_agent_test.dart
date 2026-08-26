@@ -16,7 +16,7 @@ class TestMockAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({
@@ -526,6 +526,17 @@ void main() {
       });
 
       test(
+        'invokes method channel triggerDownload with optional delay',
+        () async {
+          final service = MethodChannelAiService();
+          await service.triggerDownload(delay: const Duration(seconds: 1));
+
+          expect(log.length, equals(1));
+          expect(log.first.method, equals('triggerDownload'));
+        },
+      );
+
+      test(
         'catches exception during triggerDownload without crashing',
         () async {
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -613,6 +624,32 @@ void main() {
       });
 
       test(
+        'forwards imageBytes payload in MethodChannel invocation arguments',
+        () async {
+          final imageBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                log.add(methodCall);
+                return {
+                  'text': 'Generated text with image',
+                  'isTruncated': false,
+                };
+              });
+          final service = MethodChannelAiService();
+          final response = await service.generateContentRaw(
+            prompt: 'describe image',
+            imageBytes: imageBytes,
+          );
+
+          expect(response, isNotNull);
+          expect(response!.text, equals('Generated text with image'));
+          expect(log.first.method, equals('generateContent'));
+          expect(log.first.arguments['prompt'], equals('describe image'));
+          expect(log.first.arguments['image'], equals(imageBytes));
+        },
+      );
+
+      test(
         'parses Map response with default isTruncated false when omitted',
         () async {
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -670,6 +707,31 @@ void main() {
         );
         expect(response, isNull);
       });
+
+      test(
+        'returns null when channel returns non-Map and non-String unexpected return types',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return 42; // Integer payload
+              });
+          final service = MethodChannelAiService();
+          final responseInt = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
+          expect(responseInt, isNull);
+
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return ['item1', 'item2']; // List payload
+              });
+          final serviceList = MethodChannelAiService();
+          final responseList = await serviceList.generateContentRaw(
+            prompt: 'test prompt',
+          );
+          expect(responseList, isNull);
+        },
+      );
 
       test(
         'retries up to 4 attempts on channel exception and succeeds',
@@ -1622,7 +1684,7 @@ class _HeuristicMockAiService extends AiService {
   @override
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
   @override
   Future<void> setModelConfig({
     required String releaseStage,
