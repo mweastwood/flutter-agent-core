@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
@@ -438,7 +439,10 @@ void main() {
     test('setModelConfig handles exceptions gracefully', () async {
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-            throw PlatformException(code: 'ERROR', message: 'Failed to set config');
+            throw PlatformException(
+              code: 'ERROR',
+              message: 'Failed to set config',
+            );
           });
       final service = MethodChannelAiService();
       await expectLater(
@@ -501,7 +505,10 @@ void main() {
       test('catches exception and returns unavailable', () async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              throw PlatformException(code: 'UNAVAILABLE', message: 'Not supported');
+              throw PlatformException(
+                code: 'UNAVAILABLE',
+                message: 'Not supported',
+              );
             });
         final service = MethodChannelAiService();
         final status = await service.checkStatus();
@@ -518,14 +525,20 @@ void main() {
         expect(log.first.method, equals('triggerDownload'));
       });
 
-      test('catches exception during triggerDownload without crashing', () async {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              throw PlatformException(code: 'DOWNLOAD_ERROR', message: 'Network failed');
-            });
-        final service = MethodChannelAiService();
-        await expectLater(service.triggerDownload(), completes);
-      });
+      test(
+        'catches exception during triggerDownload without crashing',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                throw PlatformException(
+                  code: 'DOWNLOAD_ERROR',
+                  message: 'Network failed',
+                );
+              });
+          final service = MethodChannelAiService();
+          await expectLater(service.triggerDownload(), completes);
+        },
+      );
     });
 
     group('countTokens', () {
@@ -540,7 +553,10 @@ void main() {
             });
         final service = MethodChannelAiService();
         final img = Uint8List.fromList([1, 2, 3]);
-        final count = await service.countTokens(prompt: 'hello', imageBytes: img);
+        final count = await service.countTokens(
+          prompt: 'hello',
+          imageBytes: img,
+        );
 
         expect(count, equals(42));
         expect(log.first.method, equals('countTokens'));
@@ -560,7 +576,10 @@ void main() {
       test('catches exception and returns 0', () async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              throw PlatformException(code: 'ERROR', message: 'Failed to count tokens');
+              throw PlatformException(
+                code: 'ERROR',
+                message: 'Failed to count tokens',
+              );
             });
         final service = MethodChannelAiService();
         final count = await service.countTokens(prompt: 'hello');
@@ -573,10 +592,7 @@ void main() {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
             .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
               log.add(methodCall);
-              return {
-                'text': 'Generated text from map',
-                'isTruncated': true,
-              };
+              return {'text': 'Generated text from map', 'isTruncated': true};
             });
         final service = MethodChannelAiService();
         final response = await service.generateContentRaw(
@@ -596,19 +612,24 @@ void main() {
         expect(log.first.arguments['maxOutputTokens'], equals(100));
       });
 
-      test('parses Map response with default isTruncated false when omitted', () async {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              return {'text': 'Map without isTruncated'};
-            });
-        final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+      test(
+        'parses Map response with default isTruncated false when omitted',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return {'text': 'Map without isTruncated'};
+              });
+          final service = MethodChannelAiService();
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
 
-        expect(response, isNotNull);
-        expect(response!.text, equals('Map without isTruncated'));
-        expect(response.isTruncated, isFalse);
-        expect(response.isError, isFalse);
-      });
+          expect(response, isNotNull);
+          expect(response!.text, equals('Map without isTruncated'));
+          expect(response.isTruncated, isFalse);
+          expect(response.isError, isFalse);
+        },
+      );
 
       test('parses String response', () async {
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
@@ -616,7 +637,9 @@ void main() {
               return 'Generated string response';
             });
         final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+        final response = await service.generateContentRaw(
+          prompt: 'test prompt',
+        );
 
         expect(response, isNotNull);
         expect(response!.text, equals('Generated string response'));
@@ -630,7 +653,9 @@ void main() {
               return null;
             });
         final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+        final response = await service.generateContentRaw(
+          prompt: 'test prompt',
+        );
         expect(response, isNull);
       });
 
@@ -640,80 +665,116 @@ void main() {
               return {'text': null, 'isTruncated': false};
             });
         final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+        final response = await service.generateContentRaw(
+          prompt: 'test prompt',
+        );
         expect(response, isNull);
       });
 
-      test('retries up to 4 attempts on channel exception and succeeds', () async {
-        int attempts = 0;
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              attempts++;
-              if (attempts < 3) {
-                throw PlatformException(code: 'TEMPORARY_ERROR', message: 'Try again');
-              }
-              return 'Success on attempt 3';
-            });
-        final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+      test(
+        'retries up to 4 attempts on channel exception and succeeds',
+        () async {
+          int attempts = 0;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                attempts++;
+                if (attempts < 3) {
+                  throw PlatformException(
+                    code: 'TEMPORARY_ERROR',
+                    message: 'Try again',
+                  );
+                }
+                return 'Success on attempt 3';
+              });
+          final service = MethodChannelAiService();
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
 
-        expect(attempts, equals(3));
-        expect(response, isNotNull);
-        expect(response!.text, equals('Success on attempt 3'));
-        expect(response.isError, isFalse);
-      });
+          expect(attempts, equals(3));
+          expect(response, isNotNull);
+          expect(response!.text, equals('Success on attempt 3'));
+          expect(response.isError, isFalse);
+        },
+      );
 
-      test('returns error JSON with isError true when all 4 attempts fail', () async {
-        int attempts = 0;
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              attempts++;
-              throw PlatformException(code: 'CHANNEL_FAILED', message: 'Failed "attempt"');
-            });
-        final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+      test(
+        'returns error JSON with isError true when all 4 attempts fail',
+        () async {
+          int attempts = 0;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                attempts++;
+                throw PlatformException(
+                  code: 'CHANNEL_FAILED',
+                  message: 'Failed "attempt"',
+                );
+              });
+          final service = MethodChannelAiService();
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
 
-        expect(attempts, equals(4));
-        expect(response, isNotNull);
-        expect(response!.isError, isTrue);
-        expect(response.isTruncated, isFalse);
-        expect(response.text, contains('"error"'));
-        expect(response.text, contains('PlatformException(CHANNEL_FAILED, Failed \\"attempt\\", null, null)'));
-      });
+          expect(attempts, equals(4));
+          expect(response, isNotNull);
+          expect(response!.isError, isTrue);
+          expect(response.isTruncated, isFalse);
+          expect(response.text, contains('"error"'));
+          expect(
+            response.text,
+            contains(
+              'PlatformException(CHANNEL_FAILED, Failed \\"attempt\\", null, null)',
+            ),
+          );
+        },
+      );
 
-      test('generateContent calls generateContentRaw and returns text string', () async {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              return 'Content string';
-            });
-        final service = MethodChannelAiService();
-        final text = await service.generateContent(prompt: 'test prompt');
-        expect(text, equals('Content string'));
-      });
+      test(
+        'generateContent calls generateContentRaw and returns text string',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return 'Content string';
+              });
+          final service = MethodChannelAiService();
+          final text = await service.generateContent(prompt: 'test prompt');
+          expect(text, equals('Content string'));
+        },
+      );
 
-      test('generateContent returns null when generateContentRaw returns null', () async {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              return null;
-            });
-        final service = MethodChannelAiService();
-        final text = await service.generateContent(prompt: 'test prompt');
-        expect(text, isNull);
-      });
+      test(
+        'generateContent returns null when generateContentRaw returns null',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return null;
+              });
+          final service = MethodChannelAiService();
+          final text = await service.generateContent(prompt: 'test prompt');
+          expect(text, isNull);
+        },
+      );
 
-      test('catches outer exception when response parsing throws TypeError', () async {
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-              return {'text': 123}; // 123 is not String?, throws TypeError on cast
-            });
-        final service = MethodChannelAiService();
-        final response = await service.generateContentRaw(prompt: 'test prompt');
+      test(
+        'catches outer exception when response parsing throws TypeError',
+        () async {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                return {
+                  'text': 123,
+                }; // 123 is not String?, throws TypeError on cast
+              });
+          final service = MethodChannelAiService();
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
 
-        expect(response, isNotNull);
-        expect(response!.isError, isTrue);
-        expect(response.isTruncated, isFalse);
-        expect(response.text, contains('"error"'));
-      });
+          expect(response, isNotNull);
+          expect(response!.isError, isTrue);
+          expect(response.isTruncated, isFalse);
+          expect(response.text, contains('"error"'));
+        },
+      );
     });
   });
 
@@ -774,78 +835,69 @@ void main() {
       },
     );
 
-    test(
-      'returns error response immediately if initial completion has isError: true',
-      () async {
-        final result = await runWithAutoContinuation(
-          initialPrompt: 'test prompt',
-          autoContinueLimit: 3,
-          runCompletion: (prompt) async {
-            return AiResponse(
-              text: '{"error": "Initial request failed"}',
-              isError: true,
-            );
-          },
-        );
-        expect(result, equals('{"error": "Initial request failed"}'));
-      },
-    );
+    test('returns error response immediately if initial completion has isError: true', () async {
+      final result = await runWithAutoContinuation(
+        initialPrompt: 'test prompt',
+        autoContinueLimit: 3,
+        runCompletion: (prompt) async {
+          return AiResponse(
+            text: '{"error": "Initial request failed"}',
+            isError: true,
+          );
+        },
+      );
+      expect(result, equals('{"error": "Initial request failed"}'));
+    });
 
-    test(
-      'breaks and avoids stitching continuation error response when continuation returns isError: true',
-      () async {
-        var callCount = 0;
-        final result = await runWithAutoContinuation(
-          initialPrompt: 'test prompt',
-          autoContinueLimit: 3,
-          runCompletion: (prompt) async {
-            callCount++;
-            if (callCount == 1) {
-              return AiResponse(
-                text: 'Partial response that is truncated',
-                isTruncated: true,
-                isError: false,
-              );
-            }
+    test('breaks and avoids stitching continuation error response when continuation returns isError: true', () async {
+      var callCount = 0;
+      final result = await runWithAutoContinuation(
+        initialPrompt: 'test prompt',
+        autoContinueLimit: 3,
+        runCompletion: (prompt) async {
+          callCount++;
+          if (callCount == 1) {
             return AiResponse(
-              text: '{"error": "Server returned code 503"}',
-              isTruncated: false,
-              isError: true,
+              text: 'Partial response that is truncated',
+              isTruncated: true,
+              isError: false,
             );
-          },
-        );
-        expect(callCount, equals(2));
-        expect(result, equals('Partial response that is truncated'));
-      },
-    );
+          }
+          return AiResponse(
+            text: '{"error": "Server returned code 503"}',
+            isTruncated: false,
+            isError: true,
+          );
+        },
+      );
+      expect(callCount, equals(2));
+      expect(result, equals('Partial response that is truncated'));
+    });
 
-    test(
-      'breaks and repairs JSON without error JSON when continuation returns isError: true on truncated JSON',
-      () async {
-        var callCount = 0;
-        final result = await runWithAutoContinuation(
-          initialPrompt: 'generate json',
-          autoContinueLimit: 3,
-          runCompletion: (prompt) async {
-            callCount++;
-            if (callCount == 1) {
-              return AiResponse(
-                text: '{"items": ["item1"',
-                isTruncated: true,
-                isError: false,
-              );
-            }
+    test('breaks and repairs JSON without error JSON when continuation returns isError: true on truncated JSON', () async {
+      var callCount = 0;
+      final result = await runWithAutoContinuation(
+        initialPrompt: 'generate json',
+        autoContinueLimit: 3,
+        runCompletion: (prompt) async {
+          callCount++;
+          if (callCount == 1) {
             return AiResponse(
-              text: '{"error": "Rate limit reached"}',
-              isTruncated: false,
-              isError: true,
+              text: '{"items": ["item1"',
+              isTruncated: true,
+              isError: false,
             );
-          },
-        );
-        expect(callCount, equals(2));
-        expect(result, equals('{"items": ["item1"]}'));
-      },
-    );
+          }
+          return AiResponse(
+            text: '{"error": "Rate limit reached"}',
+            isTruncated: false,
+            isError: true,
+          );
+        },
+      );
+      expect(callCount, equals(2));
+      expect(result, equals('{"items": ["item1"]}'));
+    });
   });
 
   group('CloudAiService Tests', () {
@@ -892,41 +944,36 @@ void main() {
       },
     );
 
-    test(
-      'sanitizes non-ASCII code points and whitespace from apiKey in Authorization header',
-      () async {
-        final mockClient = MockHttpClient((request) async {
-          expect(
-            request.headers['Authorization'],
-            equals('Bearer test-clean-key'),
-          );
-          return http.Response(
-            jsonEncode({
-              'choices': [
-                {
-                  'message': {'role': 'assistant', 'content': 'ok'},
-                  'finish_reason': 'stop',
-                },
-              ],
-            }),
-            200,
-          );
-        });
-
-        // Key contains zero-width spaces (\u200B), non-breaking space, curly quotes, and leading/trailing whitespace
-        final service = CloudAiService(
-          baseUrl: 'https://api.gemini.com/v1',
-          apiKey: ' \u200B“test-clean-key”\u200B ',
-          modelName: 'gemini-1.5-flash',
-          httpClient: mockClient,
+    test('sanitizes non-ASCII code points and whitespace from apiKey in Authorization header', () async {
+      final mockClient = MockHttpClient((request) async {
+        expect(
+          request.headers['Authorization'],
+          equals('Bearer test-clean-key'),
         );
-
-        final response = await service.generateContentRaw(
-          prompt: 'hello world',
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': 'ok'},
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+          200,
         );
-        expect(response?.text, equals('ok'));
-      },
-    );
+      });
+
+      // Key contains zero-width spaces (\u200B), non-breaking space, curly quotes, and leading/trailing whitespace
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: ' \u200B“test-clean-key”\u200B ',
+        modelName: 'gemini-1.5-flash',
+        httpClient: mockClient,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(response?.text, equals('ok'));
+    });
 
     test('correctly detects truncation if finish_reason is length', () async {
       final mockClient = MockHttpClient((request) async {
@@ -992,34 +1039,29 @@ void main() {
       expect(response?.isError, isFalse);
     });
 
-    test(
-      'handles server errors gracefully by returning error JSON with isError: true after all retries',
-      () async {
-        int attempts = 0;
-        final mockClient = MockHttpClient((request) async {
-          attempts++;
-          return http.Response('Internal Server Error', 500);
-        });
+    test('handles server errors gracefully by returning error JSON with isError: true after all retries', () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        return http.Response('Internal Server Error', 500);
+      });
 
-        final service = CloudAiService(
-          baseUrl: 'https://api.gemini.com/v1',
-          apiKey: 'test-key',
-          modelName: 'gemini-1.5-flash',
-          maxRetries: 4,
-          initialRetryDelay: Duration.zero,
-          httpClient: mockClient,
-        );
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetries: 4,
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
 
-        final response = await service.generateContentRaw(
-          prompt: 'hello world',
-        );
-        expect(attempts, equals(5));
-        expect(response?.text, contains('error'));
-        expect(response?.text, contains('Server returned code 500'));
-        expect(response?.isTruncated, isFalse);
-        expect(response?.isError, isTrue);
-      },
-    );
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(attempts, equals(5));
+      expect(response?.text, contains('error'));
+      expect(response?.text, contains('Server returned code 500'));
+      expect(response?.isTruncated, isFalse);
+      expect(response?.isError, isTrue);
+    });
 
     test('does not retry non-retryable 400 Bad Request errors', () async {
       int attempts = 0;
@@ -1043,64 +1085,54 @@ void main() {
       expect(response?.isError, isTrue);
     });
 
-    test(
-      'handles client exception gracefully by returning exception details with isError: true after retries',
-      () async {
-        int attempts = 0;
-        final mockClient = MockHttpClient((request) async {
-          attempts++;
-          throw Exception('Connection failed');
-        });
+    test('handles client exception gracefully by returning exception details with isError: true after retries', () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        throw Exception('Connection failed');
+      });
 
-        final service = CloudAiService(
-          baseUrl: 'https://api.gemini.com/v1',
-          apiKey: 'test-key',
-          modelName: 'gemini-1.5-flash',
-          maxRetries: 3,
-          initialRetryDelay: Duration.zero,
-          httpClient: mockClient,
-        );
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetries: 3,
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
 
-        final response = await service.generateContentRaw(
-          prompt: 'hello world',
-        );
-        expect(attempts, equals(4));
-        expect(response?.text, contains('error'));
-        expect(response?.text, contains('Connection failed'));
-        expect(response?.isTruncated, isFalse);
-        expect(response?.isError, isTrue);
-      },
-    );
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(attempts, equals(4));
+      expect(response?.text, contains('error'));
+      expect(response?.text, contains('Connection failed'));
+      expect(response?.isTruncated, isFalse);
+      expect(response?.isError, isTrue);
+    });
 
-    test(
-      'clears stale exception when subsequent retry receives HTTP error response',
-      () async {
-        int attempts = 0;
-        final mockClient = MockHttpClient((request) async {
-          attempts++;
-          if (attempts == 1) {
-            throw Exception('Network connection dropped');
-          }
-          return http.Response('Bad Request', 400);
-        });
+    test('clears stale exception when subsequent retry receives HTTP error response', () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        if (attempts == 1) {
+          throw Exception('Network connection dropped');
+        }
+        return http.Response('Bad Request', 400);
+      });
 
-        final service = CloudAiService(
-          baseUrl: 'https://api.gemini.com/v1',
-          apiKey: 'test-key',
-          modelName: 'gemini-1.5-flash',
-          initialRetryDelay: Duration.zero,
-          httpClient: mockClient,
-        );
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
 
-        final response = await service.generateContentRaw(
-          prompt: 'hello world',
-        );
-        expect(attempts, equals(2));
-        expect(response?.text, contains('Server returned code 400'));
-        expect(response?.text, isNot(contains('Network connection dropped')));
-        expect(response?.isError, isTrue);
-      },
-    );
+      final response = await service.generateContentRaw(prompt: 'hello world');
+      expect(attempts, equals(2));
+      expect(response?.text, contains('Server returned code 400'));
+      expect(response?.text, isNot(contains('Network connection dropped')));
+      expect(response?.isError, isTrue);
+    });
 
     test('honors Retry-After header on 503 or 429 response', () async {
       int attempts = 0;
@@ -1140,46 +1172,43 @@ void main() {
       expect(response?.isError, isFalse);
     });
 
-    test(
-      'handles case-insensitive Retry-After header variations in calculateBackoff',
-      () {
-        final service = CloudAiService(
-          baseUrl: 'https://api.gemini.com/v1',
-          apiKey: 'test-key',
-          modelName: 'gemini-1.5-flash',
-        );
+    test('handles case-insensitive Retry-After header variations in calculateBackoff', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+      );
 
-        final pascalResponse = http.Response(
-          'Too Many Requests',
-          429,
-          headers: {'Retry-After': '5'},
-        );
-        expect(
-          service.calculateBackoff(1, pascalResponse),
-          equals(const Duration(seconds: 5)),
-        );
+      final pascalResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': '5'},
+      );
+      expect(
+        service.calculateBackoff(1, pascalResponse),
+        equals(const Duration(seconds: 5)),
+      );
 
-        final upperResponse = http.Response(
-          'Service Unavailable',
-          503,
-          headers: {'RETRY-AFTER': '12'},
-        );
-        expect(
-          service.calculateBackoff(1, upperResponse),
-          equals(const Duration(seconds: 12)),
-        );
+      final upperResponse = http.Response(
+        'Service Unavailable',
+        503,
+        headers: {'RETRY-AFTER': '12'},
+      );
+      expect(
+        service.calculateBackoff(1, upperResponse),
+        equals(const Duration(seconds: 12)),
+      );
 
-        final lowerResponse = http.Response(
-          'Service Unavailable',
-          503,
-          headers: {'retry-after': '3'},
-        );
-        expect(
-          service.calculateBackoff(1, lowerResponse),
-          equals(const Duration(seconds: 3)),
-        );
-      },
-    );
+      final lowerResponse = http.Response(
+        'Service Unavailable',
+        503,
+        headers: {'retry-after': '3'},
+      );
+      expect(
+        service.calculateBackoff(1, lowerResponse),
+        equals(const Duration(seconds: 3)),
+      );
+    });
 
     test('prevents bit-shift overflow for large retry attempt counts', () {
       final service = CloudAiService(
@@ -1425,38 +1454,35 @@ void main() {
       expect(repairJson('[{"a": 1'), equals('[{"a": 1}]'));
     });
 
-    test(
-      'AgentHistoryEntry serializes and deserializes token metrics and estimated cost',
-      () {
-        final entry = AgentHistoryEntry(
-          timestamp: DateTime.parse('2026-07-24T12:00:00Z'),
-          prompt: 'Test prompt',
-          response: 'Test response',
-          isError: false,
-          modelName: 'gemini-3.6-flash',
-          inputTokens: 150,
-          outputTokens: 50,
-          estimatedCostUsd: 0.00002625,
-        );
+    test('AgentHistoryEntry serializes and deserializes token metrics and estimated cost', () {
+      final entry = AgentHistoryEntry(
+        timestamp: DateTime.parse('2026-07-24T12:00:00Z'),
+        prompt: 'Test prompt',
+        response: 'Test response',
+        isError: false,
+        modelName: 'gemini-3.6-flash',
+        inputTokens: 150,
+        outputTokens: 50,
+        estimatedCostUsd: 0.00002625,
+      );
 
-        expect(entry.inputTokens, equals(150));
-        expect(entry.outputTokens, equals(50));
-        expect(entry.totalTokens, equals(200));
-        expect(entry.estimatedCostUsd, equals(0.00002625));
+      expect(entry.inputTokens, equals(150));
+      expect(entry.outputTokens, equals(50));
+      expect(entry.totalTokens, equals(200));
+      expect(entry.estimatedCostUsd, equals(0.00002625));
 
-        final json = entry.toJson();
-        expect(json['inputTokens'], equals(150));
-        expect(json['outputTokens'], equals(50));
-        expect(json['totalTokens'], equals(200));
-        expect(json['estimatedCostUsd'], equals(0.00002625));
+      final json = entry.toJson();
+      expect(json['inputTokens'], equals(150));
+      expect(json['outputTokens'], equals(50));
+      expect(json['totalTokens'], equals(200));
+      expect(json['estimatedCostUsd'], equals(0.00002625));
 
-        final deserialized = AgentHistoryEntry.fromJson(json);
-        expect(deserialized.inputTokens, equals(150));
-        expect(deserialized.outputTokens, equals(50));
-        expect(deserialized.totalTokens, equals(200));
-        expect(deserialized.estimatedCostUsd, equals(0.00002625));
-      },
-    );
+      final deserialized = AgentHistoryEntry.fromJson(json);
+      expect(deserialized.inputTokens, equals(150));
+      expect(deserialized.outputTokens, equals(50));
+      expect(deserialized.totalTokens, equals(200));
+      expect(deserialized.estimatedCostUsd, equals(0.00002625));
+    });
 
     test(
       'CloudAiService parses usage tokens and calculates estimatedCostUsd',
