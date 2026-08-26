@@ -53,6 +53,7 @@ class TestContinuationAiService extends AiService {
   final List<String> capturedPrompts = [];
   Uint8List? capturedImageBytes;
   double? capturedTemperature;
+  int? capturedMaxOutputTokens;
 
   TestContinuationAiService(this.rawResponses);
 
@@ -86,6 +87,7 @@ class TestContinuationAiService extends AiService {
     capturedPrompts.add(prompt);
     capturedImageBytes = imageBytes;
     capturedTemperature = temperature;
+    capturedMaxOutputTokens = maxOutputTokens;
     if (callIndex < rawResponses.length) {
       return rawResponses[callIndex++];
     }
@@ -101,6 +103,13 @@ class TestContinuationAiService extends AiService {
 
 void main() {
   group('AiResponse Tests', () {
+    test('verifies constructor default property values', () {
+      final response = AiResponse(text: 'hello');
+      expect(response.isTruncated, isFalse);
+      expect(response.isError, isFalse);
+      expect(response.estimatedCostUsd, isNull);
+    });
+
     test(
       'calculates totalTokens automatically when input and output tokens are set',
       () {
@@ -322,6 +331,48 @@ void main() {
           autoContinueLimit: 2,
         );
         expect(text, equals('Hello world!'));
+      },
+    );
+
+    test(
+      'forwards maxOutputTokens down through auto-continuation calls',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(text: 'Hello ', isTruncated: true),
+          AiResponse(text: 'world!', isTruncated: false),
+        ]);
+
+        final text = await service.generateContentWithContinuation(
+          prompt: 'continue prompt',
+          maxOutputTokens: 256,
+          autoContinueLimit: 2,
+        );
+        expect(text, equals('Hello world!'));
+        expect(service.capturedMaxOutputTokens, equals(256));
+      },
+    );
+
+    test(
+      'returns null when generateContentRaw returns null (autoContinueLimit <= 0)',
+      () async {
+        final service = TestContinuationAiService([]);
+        final text = await service.generateContentWithContinuation(
+          prompt: 'null prompt',
+          autoContinueLimit: 0,
+        );
+        expect(text, isNull);
+      },
+    );
+
+    test(
+      'returns null when generateContentRaw returns null (autoContinueLimit > 0)',
+      () async {
+        final service = TestContinuationAiService([]);
+        final text = await service.generateContentWithContinuation(
+          prompt: 'null prompt',
+          autoContinueLimit: 2,
+        );
+        expect(text, isNull);
       },
     );
   });
