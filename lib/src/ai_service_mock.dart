@@ -6,9 +6,14 @@ import 'ai_service.dart';
 
 class MockAiService extends AiService {
   AiCoreStatus _status = AiCoreStatus.available;
+  Future<void>? _activeDownloadFuture;
 
-  /// Duration to simulate model downloading delay in MockAiService.
-  Duration downloadDelay = const Duration(seconds: 2);
+  /// Default delay for simulated download operations in [triggerDownload].
+  ///
+  /// Defaults to [Duration.zero] if not specified.
+  final Duration downloadDelay;
+
+  MockAiService({this.downloadDelay = Duration.zero});
 
   @override
   Future<AiCoreStatus> checkStatus() async {
@@ -19,15 +24,36 @@ class MockAiService extends AiService {
     _status = status;
   }
 
+  /// Triggers a simulated download operation when [_status] is [AiCoreStatus.downloadable].
+  ///
+  /// The optional [delay] parameter overrides [downloadDelay] when starting a new download operation.
+  /// If omitted or `null`, [downloadDelay] (which defaults to [Duration.zero]) is used.
+  /// If [_status] is already [AiCoreStatus.downloading] or a download is active, this method returns
+  /// the active download [Future] so concurrent callers can await completion of the ongoing download;
+  /// note that any [delay] parameter provided in concurrent calls while a download is active is ignored.
+  /// If [_status] is not downloadable, this method returns immediately.
   @override
-  Future<void> triggerDownload({Duration? delay}) async {
+  Future<void> triggerDownload({Duration? delay}) {
+    if (_activeDownloadFuture != null) {
+      return _activeDownloadFuture!;
+    }
     if (_status == AiCoreStatus.downloadable) {
       _status = AiCoreStatus.downloading;
       final effectiveDelay = delay ?? downloadDelay;
-      if (effectiveDelay > Duration.zero) {
-        await Future.delayed(effectiveDelay);
+      _activeDownloadFuture = _runDownload(effectiveDelay);
+      return _activeDownloadFuture!;
+    }
+    return Future.value();
+  }
+
+  Future<void> _runDownload(Duration delay) async {
+    try {
+      if (delay > Duration.zero) {
+        await Future.delayed(delay);
       }
       _status = AiCoreStatus.available;
+    } finally {
+      _activeDownloadFuture = null;
     }
   }
 
