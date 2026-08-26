@@ -142,6 +142,23 @@ void main() {
         expect(response2.totalTokens, isNull);
       },
     );
+
+    test(
+      'evaluates totalTokens to 0 when inputTokens and outputTokens are 0',
+      () {
+        final response = AiResponse(
+          text: 'hello',
+          inputTokens: 0,
+          outputTokens: 0,
+        );
+        expect(response.totalTokens, equals(0));
+      },
+    );
+
+    test('preserves estimatedCostUsd when passed into constructor', () {
+      final response = AiResponse(text: 'hello', estimatedCostUsd: 0.0025);
+      expect(response.estimatedCostUsd, equals(0.0025));
+    });
   });
 
   group('AiService Base Class Tests', () {
@@ -373,6 +390,24 @@ void main() {
           autoContinueLimit: 2,
         );
         expect(text, isNull);
+      },
+    );
+
+    test(
+      'halts auto-continuation loop when autoContinueLimit threshold is reached',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(text: 'Alpha continuation, ', isTruncated: true),
+          AiResponse(text: 'Beta continuation, ', isTruncated: true),
+          AiResponse(text: 'Gamma continuation.', isTruncated: false),
+        ]);
+
+        final text = await service.generateContentWithContinuation(
+          prompt: 'continue prompt',
+          autoContinueLimit: 1,
+        );
+        expect(service.callIndex, equals(2));
+        expect(text, equals('Alpha continuation, Beta continuation, '));
       },
     );
   });
