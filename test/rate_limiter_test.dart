@@ -21,8 +21,16 @@ void main() {
         );
 
         limiter.throttleBeforeRequest(10);
+        expect(async.elapsed, equals(Duration.zero));
+        expect(limiter.requestTimestamps.length, equals(1));
+
         limiter.throttleBeforeRequest(10);
-        async.elapse(const Duration(milliseconds: 100));
+        expect(limiter.requestTimestamps.length, equals(1));
+
+        async.elapse(const Duration(milliseconds: 50));
+        expect(limiter.requestTimestamps.length, equals(1));
+
+        async.elapse(const Duration(milliseconds: 50));
 
         // The second request should be throttled/delayed to enforce the 100ms interval
         expect(async.elapsed, equals(const Duration(milliseconds: 100)));
@@ -52,10 +60,19 @@ void main() {
         );
 
         limiter.throttleBeforeRequest(10);
+        expect(async.elapsed, equals(Duration.zero));
+        expect(limiter.requestTimestamps.length, equals(1));
+
         limiter.throttleBeforeRequest(10);
-        async.elapse(const Duration(milliseconds: 200));
+        expect(limiter.requestTimestamps.length, equals(1));
+
+        async.elapse(const Duration(milliseconds: 100));
+        expect(limiter.requestTimestamps.length, equals(1));
+
+        async.elapse(const Duration(milliseconds: 100));
 
         expect(async.elapsed, equals(const Duration(milliseconds: 200)));
+        expect(limiter.requestTimestamps.length, equals(2));
         expect(
           limiter.requestTimestamps[1].difference(limiter.requestTimestamps[0]),
           equals(const Duration(milliseconds: 200)),
@@ -107,9 +124,7 @@ void main() {
             nowProvider: () => clock.now(),
           );
 
-          final oldTimestamp = clock.now().subtract(
-            const Duration(minutes: 2),
-          );
+          final oldTimestamp = clock.now().subtract(const Duration(minutes: 2));
           final recentTimestamp = clock.now().subtract(
             const Duration(seconds: 10),
           );
@@ -126,6 +141,7 @@ void main() {
           expect(limiter.requestTimestamps.length, equals(2));
           expect(limiter.requestTimestamps.contains(oldTimestamp), isFalse);
           expect(limiter.requestTimestamps.contains(recentTimestamp), isTrue);
+          expect(limiter.requestTimestamps.contains(clock.now()), isTrue);
 
           expect(limiter.tokenUsage.length, equals(2));
           expect(
@@ -134,6 +150,12 @@ void main() {
           );
           expect(
             limiter.tokenUsage.any((item) => item.timestamp == recentTimestamp),
+            isTrue,
+          );
+          expect(
+            limiter.tokenUsage.any(
+              (item) => item.timestamp == clock.now() && item.tokenCount == 20,
+            ),
             isTrue,
           );
         });
@@ -345,7 +367,8 @@ void main() {
 
           final limiter = RateLimiter(
             modelInfo: mockInfo,
-            throttlePercentage: 25.0,
+            throttlePercentage:
+                25.0, // 0.25 RPS -> 4000ms interval, 1.25 RPM, 12.5 TPM
             nowProvider: () => clock.now(),
           );
 
