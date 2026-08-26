@@ -76,19 +76,16 @@ void main() {
       },
     );
 
-    test(
-      'triggerDownload works via polymorphic AiService reference',
-      () async {
-        final AiService service = MockAiService(
-          downloadDelay: const Duration(milliseconds: 50),
-        );
-        (service as MockAiService).setMockStatus(AiCoreStatus.downloadable);
+    test('triggerDownload works via polymorphic AiService reference', () async {
+      final AiService service = MockAiService(
+        downloadDelay: const Duration(milliseconds: 50),
+      );
+      (service as MockAiService).setMockStatus(AiCoreStatus.downloadable);
 
-        final downloadFuture = service.triggerDownload();
-        await downloadFuture;
-        expect(await service.checkStatus(), equals(AiCoreStatus.available));
-      },
-    );
+      final downloadFuture = service.triggerDownload();
+      await downloadFuture;
+      expect(await service.checkStatus(), equals(AiCoreStatus.available));
+    });
 
     test(
       'triggerDownload can be re-triggered after zero-delay download completes',
