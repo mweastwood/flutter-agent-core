@@ -42,7 +42,7 @@ class AiResponse {
 abstract class AiService {
   Future<AiCoreStatus> checkStatus();
 
-  /// Triggers on-demand downloading of the AI model assets.
+  /// Triggers a simulated or platform model download operation.
   Future<void> triggerDownload({Duration? delay});
   Future<void> setModelConfig({
     required String releaseStage,

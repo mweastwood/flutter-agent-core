@@ -863,7 +863,9 @@ void main() {
     test(
       'triggerDownload uses default delay when parameter is omitted',
       () async {
-        final mock = MockAiService();
+        final mock = MockAiService(
+          downloadDelay: const Duration(milliseconds: 50),
+        );
         mock.setMockStatus(AiCoreStatus.downloadable);
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
 
