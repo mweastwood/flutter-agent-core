@@ -850,7 +850,9 @@ void main() {
         mock.setMockStatus(AiCoreStatus.downloadable);
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
 
-        final future = mock.triggerDownload(delay: const Duration(milliseconds: 50));
+        final future = mock.triggerDownload(
+          delay: const Duration(milliseconds: 50),
+        );
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
 
         await future;
