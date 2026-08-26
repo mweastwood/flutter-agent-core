@@ -51,7 +51,7 @@ class WebAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {
+  Future<void> triggerDownload({Duration? delay}) async {
     try {
       if (delay != null) {
         await Future.delayed(delay);

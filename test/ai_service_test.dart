@@ -17,7 +17,7 @@ class TestFakeAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({
@@ -61,7 +61,7 @@ class TestContinuationAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({

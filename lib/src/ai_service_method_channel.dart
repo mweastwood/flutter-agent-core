@@ -30,7 +30,7 @@ class MethodChannelAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {
+  Future<void> triggerDownload({Duration? delay}) async {
     try {
       await _channel.invokeMethod<void>(
         'triggerDownload',
