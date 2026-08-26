@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
 import 'package:flutter_agent_core/src/ai_service_stub.dart'
@@ -102,14 +101,17 @@ class TestContinuationAiService extends AiService {
 
 void main() {
   group('AiResponse Tests', () {
-    test('calculates totalTokens automatically when input and output tokens are set', () {
-      final response = AiResponse(
-        text: 'hello',
-        inputTokens: 15,
-        outputTokens: 25,
-      );
-      expect(response.totalTokens, equals(40));
-    });
+    test(
+      'calculates totalTokens automatically when input and output tokens are set',
+      () {
+        final response = AiResponse(
+          text: 'hello',
+          inputTokens: 15,
+          outputTokens: 25,
+        );
+        expect(response.totalTokens, equals(40));
+      },
+    );
 
     test('uses explicit totalTokens when provided', () {
       final response = AiResponse(
@@ -121,36 +123,45 @@ void main() {
       expect(response.totalTokens, equals(100));
     });
 
-    test('leaves totalTokens as null when inputTokens or outputTokens are missing', () {
-      final response1 = AiResponse(text: 'hello', inputTokens: 10);
-      expect(response1.totalTokens, isNull);
+    test(
+      'leaves totalTokens as null when inputTokens or outputTokens are missing',
+      () {
+        final response1 = AiResponse(text: 'hello', inputTokens: 10);
+        expect(response1.totalTokens, isNull);
 
-      final response2 = AiResponse(text: 'hello', outputTokens: 20);
-      expect(response2.totalTokens, isNull);
-    });
+        final response2 = AiResponse(text: 'hello', outputTokens: 20);
+        expect(response2.totalTokens, isNull);
+      },
+    );
   });
 
   group('AiService Base Class Tests', () {
-    test('generateContentRaw returns null when generateContent returns null', () async {
-      final service = TestFakeAiService()..mockContent = null;
-      final raw = await service.generateContentRaw(prompt: 'test');
-      expect(raw, isNull);
-    });
+    test(
+      'generateContentRaw returns null when generateContent returns null',
+      () async {
+        final service = TestFakeAiService()..mockContent = null;
+        final raw = await service.generateContentRaw(prompt: 'test');
+        expect(raw, isNull);
+      },
+    );
 
-    test('generateContentRaw wraps generateContent text in AiResponse', () async {
-      final service = TestFakeAiService()..mockContent = 'Hello world';
-      final raw = await service.generateContentRaw(
-        prompt: 'test prompt',
-        temperature: 0.8,
-        maxOutputTokens: 50,
-      );
-      expect(raw, isNotNull);
-      expect(raw!.text, equals('Hello world'));
-      expect(raw.isTruncated, isFalse);
-      expect(service.capturedPrompt, equals('test prompt'));
-      expect(service.capturedTemperature, equals(0.8));
-      expect(service.capturedMaxOutputTokens, equals(50));
-    });
+    test(
+      'generateContentRaw wraps generateContent text in AiResponse',
+      () async {
+        final service = TestFakeAiService()..mockContent = 'Hello world';
+        final raw = await service.generateContentRaw(
+          prompt: 'test prompt',
+          temperature: 0.8,
+          maxOutputTokens: 50,
+        );
+        expect(raw, isNotNull);
+        expect(raw!.text, equals('Hello world'));
+        expect(raw.isTruncated, isFalse);
+        expect(service.capturedPrompt, equals('test prompt'));
+        expect(service.capturedTemperature, equals(0.8));
+        expect(service.capturedMaxOutputTokens, equals(50));
+      },
+    );
   });
 
   group('AiServiceJsonExtension.generateJson Tests', () {
@@ -179,20 +190,16 @@ void main() {
       expect(mapResult, equals({'status': 'ok'}));
 
       final serviceList = TestFakeAiService()..mockContent = '[10, 20, 30]';
-      final listResult = await serviceList.generateJson(prompt: 'give raw list');
+      final listResult = await serviceList.generateJson(
+        prompt: 'give raw list',
+      );
       expect(listResult, equals([10, 20, 30]));
     });
 
     test('integrates auto-continuation when autoContinueLimit > 0', () async {
       final service = TestContinuationAiService([
-        AiResponse(
-          text: '```json\n{"items": ["first",',
-          isTruncated: true,
-        ),
-        AiResponse(
-          text: ' "second"]}\n```',
-          isTruncated: false,
-        ),
+        AiResponse(text: '```json\n{"items": ["first",', isTruncated: true),
+        AiResponse(text: ' "second"]}\n```', isTruncated: false),
       ]);
 
       final dummyImage = Uint8List.fromList([5, 10]);
@@ -210,19 +217,25 @@ void main() {
       expect(service.capturedTemperature, equals(0.5));
     });
 
-    test('returns null when generateContentWithContinuation returns null', () async {
-      final service = TestFakeAiService()..mockContent = null;
-      final result = await service.generateJson(prompt: 'null prompt');
-      expect(result, isNull);
-    });
+    test(
+      'returns null when generateContentWithContinuation returns null',
+      () async {
+        final service = TestFakeAiService()..mockContent = null;
+        final result = await service.generateJson(prompt: 'null prompt');
+        expect(result, isNull);
+      },
+    );
 
-    test('returns null fallback when AI response contains invalid JSON syntax', () async {
-      final service = TestFakeAiService()
-        ..mockContent = '```json\n{invalid json syntax:\n```';
+    test(
+      'returns null fallback when AI response contains invalid JSON syntax',
+      () async {
+        final service = TestFakeAiService()
+          ..mockContent = '```json\n{invalid json syntax:\n```';
 
-      final result = await service.generateJson(prompt: 'invalid json');
-      expect(result, isNull);
-    });
+        final result = await service.generateJson(prompt: 'invalid json');
+        expect(result, isNull);
+      },
+    );
 
     test('returns null fallback for plain non-JSON text', () async {
       final service = TestFakeAiService()
@@ -238,11 +251,14 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
 
-    test('instantiates MethodChannelAiService when defaultTargetPlatform is Android', () {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      final service = getAiService();
-      expect(service, isA<MethodChannelAiService>());
-    });
+    test(
+      'instantiates MethodChannelAiService when defaultTargetPlatform is Android',
+      () {
+        debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        final service = getAiService();
+        expect(service, isA<MethodChannelAiService>());
+      },
+    );
 
     test('instantiates MockAiService as fallback on non-Android platforms', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
@@ -261,11 +277,13 @@ void main() {
       expect(getAiService(), isA<MockAiService>());
     });
 
-    test('getWebAiService throws UnsupportedError when invoked on non-Web platform', () {
-      if (!kIsWeb) {
+    test(
+      'getWebAiService throws UnsupportedError when invoked on non-Web platform',
+      () {
         expect(() => getWebAiService(), throwsA(isA<UnsupportedError>()));
-      }
-    });
+      },
+      skip: kIsWeb,
+    );
   });
 
   group('aiServiceProvider Tests', () {
@@ -279,26 +297,32 @@ void main() {
   });
 
   group('AiServiceContinuationExtension Tests', () {
-    test('generateContentWithContinuation returns raw text directly when autoContinueLimit <= 0', () async {
-      final service = TestFakeAiService()..mockContent = 'Simple content';
-      final text = await service.generateContentWithContinuation(
-        prompt: 'test prompt',
-        autoContinueLimit: 0,
-      );
-      expect(text, equals('Simple content'));
-    });
+    test(
+      'generateContentWithContinuation returns raw text directly when autoContinueLimit <= 0',
+      () async {
+        final service = TestFakeAiService()..mockContent = 'Simple content';
+        final text = await service.generateContentWithContinuation(
+          prompt: 'test prompt',
+          autoContinueLimit: 0,
+        );
+        expect(text, equals('Simple content'));
+      },
+    );
 
-    test('generateContentWithContinuation triggers auto-continuation loop when autoContinueLimit > 0', () async {
-      final service = TestContinuationAiService([
-        AiResponse(text: 'Hello ', isTruncated: true),
-        AiResponse(text: 'world!', isTruncated: false),
-      ]);
+    test(
+      'generateContentWithContinuation triggers auto-continuation loop when autoContinueLimit > 0',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(text: 'Hello ', isTruncated: true),
+          AiResponse(text: 'world!', isTruncated: false),
+        ]);
 
-      final text = await service.generateContentWithContinuation(
-        prompt: 'continue prompt',
-        autoContinueLimit: 2,
-      );
-      expect(text, equals('Hello world!'));
-    });
+        final text = await service.generateContentWithContinuation(
+          prompt: 'continue prompt',
+          autoContinueLimit: 2,
+        );
+        expect(text, equals('Hello world!'));
+      },
+    );
   });
 }
