@@ -44,11 +44,25 @@ void main() {
       expect(await service.checkStatus(), equals(AiCoreStatus.available));
     });
 
-    test('triggerDownload allows overriding delay parameter with Duration.zero', () async {
+    test('triggerDownload allows overriding non-zero downloadDelay with Duration.zero', () async {
       final service = MockAiService(downloadDelay: const Duration(seconds: 10));
       service.setMockStatus(AiCoreStatus.downloadable);
 
       await service.triggerDownload(delay: Duration.zero);
+      expect(await service.checkStatus(), equals(AiCoreStatus.available));
+    });
+
+    test('concurrent triggerDownload calls share and await active download Future', () async {
+      final service = MockAiService(downloadDelay: const Duration(milliseconds: 50));
+      service.setMockStatus(AiCoreStatus.downloadable);
+
+      final downloadFuture1 = service.triggerDownload();
+      expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+
+      final downloadFuture2 = service.triggerDownload();
+      expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+
+      await Future.wait([downloadFuture1, downloadFuture2]);
       expect(await service.checkStatus(), equals(AiCoreStatus.available));
     });
 
