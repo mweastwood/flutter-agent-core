@@ -523,6 +523,7 @@ void main() {
 
         expect(log.length, equals(1));
         expect(log.first.method, equals('triggerDownload'));
+        expect(log.first.arguments, isNull);
       });
 
       test(
@@ -533,6 +534,10 @@ void main() {
 
           expect(log.length, equals(1));
           expect(log.first.method, equals('triggerDownload'));
+          expect(
+            log.first.arguments,
+            equals({'delayMs': 1000}),
+          );
         },
       );
 
@@ -837,6 +842,29 @@ void main() {
           expect(response.text, contains('"error"'));
         },
       );
+    });
+  });
+
+  group('MockAiService Tests', () {
+    test('triggerDownload transitions status with custom delay parameter', () async {
+      final mock = MockAiService();
+      mock.setMockStatus(AiCoreStatus.downloadable);
+      expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
+
+      await mock.triggerDownload(delay: const Duration(milliseconds: 50));
+      expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
+
+      await Future.delayed(const Duration(milliseconds: 100));
+      expect(await mock.checkStatus(), equals(AiCoreStatus.available));
+    });
+
+    test('triggerDownload uses default delay when parameter is omitted', () async {
+      final mock = MockAiService();
+      mock.setMockStatus(AiCoreStatus.downloadable);
+      expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
+
+      await mock.triggerDownload();
+      expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
     });
   });
 

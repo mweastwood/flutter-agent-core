@@ -23,10 +23,10 @@ class MockAiService extends AiService {
   Future<void> triggerDownload({Duration? delay}) async {
     if (_status == AiCoreStatus.downloadable) {
       _status = AiCoreStatus.downloading;
-      if (downloadDelay > Duration.zero) {
-        await Future.delayed(downloadDelay);
-      }
-      _status = AiCoreStatus.available;
+      final effectiveDelay = delay ?? downloadDelay;
+      Future.delayed(effectiveDelay, () {
+        _status = AiCoreStatus.available;
+      });
     }
   }
 

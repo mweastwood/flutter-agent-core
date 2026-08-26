@@ -32,7 +32,10 @@ class MethodChannelAiService extends AiService {
   @override
   Future<void> triggerDownload({Duration? delay}) async {
     try {
-      await _channel.invokeMethod<void>('triggerDownload');
+      await _channel.invokeMethod<void>(
+        'triggerDownload',
+        delay != null ? {'delayMs': delay.inMilliseconds} : null,
+      );
     } catch (e, stack) {
       debugPrint('Error invoking triggerDownload via MethodChannel: $e');
       debugPrint(stack.toString());
