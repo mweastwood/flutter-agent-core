@@ -50,6 +50,46 @@ class TestMockAiService extends AiService {
   }
 }
 
+class _RawStringMockAiService extends AiService {
+  final List<String?> rawResponses;
+  int callCount = 0;
+  final List<String> capturedPrompts = [];
+
+  _RawStringMockAiService(this.rawResponses);
+
+  @override
+  Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
+
+  @override
+  Future<void> triggerDownload() async {}
+
+  @override
+  Future<void> setModelConfig({
+    required String releaseStage,
+    required String preference,
+  }) async {}
+
+  @override
+  Future<String?> generateContent({
+    required String prompt,
+    Uint8List? imageBytes,
+    double temperature = 1.0,
+    int? maxOutputTokens,
+  }) async {
+    capturedPrompts.add(prompt);
+    if (callCount < rawResponses.length) {
+      return rawResponses[callCount++];
+    }
+    return jsonEncode({'tool': 'finish', 'reasoning': 'Done'});
+  }
+
+  @override
+  Future<int> countTokens({
+    required String prompt,
+    Uint8List? imageBytes,
+  }) async => 0;
+}
+
 class TestStepResult {
   final String tool;
   final String feedback;
@@ -160,6 +200,158 @@ void main() {
 
       expect(delegate.counter, equals(2));
       expect(delegate.actionsApplied, equals(['increment', 'increment']));
+    });
+
+    test('throws Exception when AI service returns null response', () async {
+      final mockAi = _RawStringMockAiService([null]);
+      final delegate = MockTextAgentDelegate();
+      final harness = AgentHarness<TestStepResult>(
+        aiService: mockAi,
+        delegate: delegate,
+      );
+
+      expect(
+        () => harness.runLoop(userPrompt: 'test prompt'),
+        throwsA(
+          isA<Exception>().having(
+            (e) => e.toString(),
+            'message',
+            contains('AI service returned empty response'),
+          ),
+        ),
+      );
+    });
+
+    test(
+      'catches FormatException on malformed non-JSON response and wraps error map',
+      () async {
+        final mockAi = _RawStringMockAiService(['Not a valid JSON']);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final steps = await harness.runLoop(userPrompt: 'parse invalid json');
+
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, startsWith('Error: FormatException:'));
+        expect(delegate.actionsApplied, isEmpty);
+      },
+    );
+
+    test(
+      'handles JSON response with explicit error key and terminates early',
+      () async {
+        final mockAi = TestMockAiService([
+          {'error': 'Custom API Error'},
+          {'action': 'increment'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final steps = await harness.runLoop(userPrompt: 'trigger error');
+
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, equals('Error: Custom API Error'));
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
+
+    test(
+      'invokes onStep callback with step result and 1-based index for normal, finish, and error steps',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final recordedSteps = <int>[];
+        final recordedResults = <TestStepResult>[];
+
+        final steps = await harness.runLoop(
+          userPrompt: 'count to 2',
+          maxSteps: 5,
+          onStep: (stepResult, currentStep) {
+            recordedSteps.add(currentStep);
+            recordedResults.add(stepResult);
+          },
+        );
+
+        expect(steps.length, equals(3));
+        expect(recordedSteps, equals([1, 2, 3]));
+        expect(recordedResults, equals(steps));
+        expect(recordedResults[0].tool, equals('inc'));
+        expect(recordedResults[1].tool, equals('inc'));
+        expect(recordedResults[2].isFinish, isTrue);
+
+        final errorMockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'error': 'Server overloaded'},
+        ]);
+        final errorDelegate = MockTextAgentDelegate();
+        final errorHarness = AgentHarness<TestStepResult>(
+          aiService: errorMockAi,
+          delegate: errorDelegate,
+        );
+        final errorRecordedSteps = <int>[];
+        final errorRecordedResults = <TestStepResult>[];
+
+        final errorSteps = await errorHarness.runLoop(
+          userPrompt: 'fail on step 2',
+          maxSteps: 5,
+          onStep: (stepResult, currentStep) {
+            errorRecordedSteps.add(currentStep);
+            errorRecordedResults.add(stepResult);
+          },
+        );
+
+        expect(errorSteps.length, equals(2));
+        expect(errorRecordedSteps, equals([1, 2]));
+        expect(errorRecordedResults, equals(errorSteps));
+        expect(
+          errorRecordedResults[1].feedback,
+          equals('Error: Server overloaded'),
+        );
+      },
+    );
+
+    test('stops loop execution when maxSteps count is reached', () async {
+      final mockAi = TestMockAiService([
+        {'action': 'increment', 'tool': 'inc'},
+        {'action': 'increment', 'tool': 'inc'},
+        {'action': 'increment', 'tool': 'inc'},
+        {'action': 'increment', 'tool': 'inc'},
+        {'action': 'increment', 'tool': 'inc'},
+      ]);
+      final delegate = MockTextAgentDelegate();
+      final harness = AgentHarness<TestStepResult>(
+        aiService: mockAi,
+        delegate: delegate,
+      );
+
+      final steps = await harness.runLoop(
+        userPrompt: 'keep incrementing',
+        maxSteps: 3,
+      );
+
+      expect(steps.length, equals(3));
+      expect(mockAi.callCount, equals(3));
+      expect(delegate.counter, equals(3));
+      expect(
+        delegate.actionsApplied,
+        equals(['increment', 'increment', 'increment']),
+      );
     });
   });
 
