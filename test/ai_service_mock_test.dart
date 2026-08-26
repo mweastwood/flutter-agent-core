@@ -44,36 +44,51 @@ void main() {
       expect(await service.checkStatus(), equals(AiCoreStatus.available));
     });
 
-    test('triggerDownload allows overriding non-zero downloadDelay with Duration.zero', () async {
-      final service = MockAiService(downloadDelay: const Duration(seconds: 10));
-      service.setMockStatus(AiCoreStatus.downloadable);
+    test(
+      'triggerDownload allows overriding non-zero downloadDelay with Duration.zero',
+      () async {
+        final service = MockAiService(
+          downloadDelay: const Duration(seconds: 10),
+        );
+        service.setMockStatus(AiCoreStatus.downloadable);
 
-      await service.triggerDownload(delay: Duration.zero);
-      expect(await service.checkStatus(), equals(AiCoreStatus.available));
-    });
+        await service.triggerDownload(delay: Duration.zero);
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
 
-    test('concurrent triggerDownload calls share and await active download Future', () async {
-      final service = MockAiService(downloadDelay: const Duration(milliseconds: 50));
-      service.setMockStatus(AiCoreStatus.downloadable);
+    test(
+      'concurrent triggerDownload calls share and await active download Future',
+      () async {
+        final service = MockAiService(
+          downloadDelay: const Duration(milliseconds: 50),
+        );
+        service.setMockStatus(AiCoreStatus.downloadable);
 
-      final downloadFuture1 = service.triggerDownload();
-      expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+        final downloadFuture1 = service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
 
-      final downloadFuture2 = service.triggerDownload();
-      expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+        final downloadFuture2 = service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
 
-      await Future.wait([downloadFuture1, downloadFuture2]);
-      expect(await service.checkStatus(), equals(AiCoreStatus.available));
-    });
+        await Future.wait([downloadFuture1, downloadFuture2]);
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
 
-    test('triggerDownload works via polymorphic AiService reference with optional delay', () async {
-      final AiService service = MockAiService(downloadDelay: const Duration(milliseconds: 50));
-      (service as MockAiService).setMockStatus(AiCoreStatus.downloadable);
+    test(
+      'triggerDownload works via polymorphic AiService reference with optional delay',
+      () async {
+        final AiService service = MockAiService(
+          downloadDelay: const Duration(milliseconds: 50),
+        );
+        (service as MockAiService).setMockStatus(AiCoreStatus.downloadable);
 
-      final downloadFuture = service.triggerDownload(delay: Duration.zero);
-      await downloadFuture;
-      expect(await service.checkStatus(), equals(AiCoreStatus.available));
-    });
+        final downloadFuture = service.triggerDownload(delay: Duration.zero);
+        await downloadFuture;
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
 
     test(
       'triggerDownload does nothing if status is not downloadable',
