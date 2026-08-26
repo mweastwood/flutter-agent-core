@@ -62,7 +62,7 @@ class _RawStringMockAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({
@@ -850,10 +850,10 @@ void main() {
         mock.setMockStatus(AiCoreStatus.downloadable);
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
 
-        await mock.triggerDownload(delay: const Duration(milliseconds: 50));
+        final future = mock.triggerDownload(delay: const Duration(milliseconds: 50));
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
 
-        await Future.delayed(const Duration(milliseconds: 100));
+        await future;
         expect(await mock.checkStatus(), equals(AiCoreStatus.available));
       },
     );
@@ -865,8 +865,10 @@ void main() {
         mock.setMockStatus(AiCoreStatus.downloadable);
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
 
-        await mock.triggerDownload();
+        final future = mock.triggerDownload();
         expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
+        await future;
+        expect(await mock.checkStatus(), equals(AiCoreStatus.available));
       },
     );
   });
