@@ -7,11 +7,20 @@ import 'model_database.dart';
 class RateLimiter {
   final double throttlePercentage;
   final CloudModelInfo modelInfo;
+  final DateTime Function() _now;
 
   final List<DateTime> _requestTimestamps = [];
   final List<({DateTime timestamp, int tokenCount})> _tokenUsage = [];
 
-  RateLimiter({required this.modelInfo, this.throttlePercentage = 100.0});
+  /// Creates a new [RateLimiter] instance.
+  ///
+  /// The [nowProvider] parameter is an optional callback returning a [DateTime],
+  /// providing a dependency injection point for clock control during testing.
+  RateLimiter({
+    required this.modelInfo,
+    this.throttlePercentage = 100.0,
+    DateTime Function()? nowProvider,
+  }) : _now = nowProvider ?? DateTime.now;
 
   @visibleForTesting
   List<DateTime> get requestTimestamps => List.unmodifiable(_requestTimestamps);
@@ -28,7 +37,7 @@ class RateLimiter {
 
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
     if (throttlePercentage <= 0.0) {
-      final actualRequestTime = DateTime.now();
+      final actualRequestTime = _now();
       _requestTimestamps.add(actualRequestTime);
       _tokenUsage.add((
         timestamp: actualRequestTime,
@@ -37,7 +46,7 @@ class RateLimiter {
       return;
     }
 
-    final now = DateTime.now();
+    final now = _now();
     final double pctFactor = throttlePercentage / 100.0;
 
     _requestTimestamps.removeWhere(
@@ -70,7 +79,7 @@ class RateLimiter {
     if (modelInfo.limitRpm != null && modelInfo.limitRpm! > 0) {
       final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
       while (true) {
-        final checkTime = DateTime.now();
+        final checkTime = _now();
         _requestTimestamps.removeWhere(
           (dt) => checkTime.difference(dt) > const Duration(minutes: 1),
         );
@@ -92,7 +101,7 @@ class RateLimiter {
     if (modelInfo.limitTpm != null && modelInfo.limitTpm! > 0) {
       final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
       while (true) {
-        final checkTime = DateTime.now();
+        final checkTime = _now();
         _tokenUsage.removeWhere(
           (item) =>
               checkTime.difference(item.timestamp) > const Duration(minutes: 1),
@@ -117,7 +126,7 @@ class RateLimiter {
       }
     }
 
-    final actualRequestTime = DateTime.now();
+    final actualRequestTime = _now();
     _requestTimestamps.add(actualRequestTime);
     _tokenUsage.add((
       timestamp: actualRequestTime,
