@@ -49,7 +49,7 @@ class WebAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {
+  Future<void> triggerDownload({Duration? delay}) async {
     try {
       final ai = chromeAi;
       if (ai == null) return;

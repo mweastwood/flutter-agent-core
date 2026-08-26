@@ -49,7 +49,7 @@ class CloudAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({

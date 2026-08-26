@@ -40,7 +40,7 @@ class AiResponse {
 
 abstract class AiService {
   Future<AiCoreStatus> checkStatus();
-  Future<void> triggerDownload();
+  Future<void> triggerDownload({Duration? delay});
   Future<void> setModelConfig({
     required String releaseStage,
     required String preference,

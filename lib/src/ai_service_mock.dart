@@ -16,10 +16,10 @@ class MockAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {
+  Future<void> triggerDownload({Duration? delay}) async {
     if (_status == AiCoreStatus.downloadable) {
       _status = AiCoreStatus.downloading;
-      Future.delayed(const Duration(seconds: 2), () {
+      Future.delayed(delay ?? const Duration(seconds: 2), () {
         _status = AiCoreStatus.available;
       });
     }

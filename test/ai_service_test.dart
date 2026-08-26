@@ -17,7 +17,7 @@ class TestFakeAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({
@@ -61,7 +61,7 @@ class TestContinuationAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {}
 
   @override
   Future<void> setModelConfig({
@@ -159,6 +159,11 @@ void main() {
       final response = AiResponse(text: 'hello', estimatedCostUsd: 0.0025);
       expect(response.estimatedCostUsd, equals(0.0025));
     });
+
+    test('verifies explicit isError property when set to true', () {
+      final response = AiResponse(text: 'error', isError: true);
+      expect(response.isError, isTrue);
+    });
   });
 
   group('AiService Base Class Tests', () {
@@ -172,11 +177,13 @@ void main() {
     );
 
     test(
-      'generateContentRaw wraps generateContent text in AiResponse',
+      'generateContentRaw wraps generateContent text in AiResponse and forwards imageBytes',
       () async {
         final service = TestFakeAiService()..mockContent = 'Hello world';
+        final imageBytes = Uint8List.fromList([1, 2, 3]);
         final raw = await service.generateContentRaw(
           prompt: 'test prompt',
+          imageBytes: imageBytes,
           temperature: 0.8,
           maxOutputTokens: 50,
         );
@@ -184,6 +191,7 @@ void main() {
         expect(raw!.text, equals('Hello world'));
         expect(raw.isTruncated, isFalse);
         expect(service.capturedPrompt, equals('test prompt'));
+        expect(service.capturedImageBytes, equals(imageBytes));
         expect(service.capturedTemperature, equals(0.8));
         expect(service.capturedMaxOutputTokens, equals(50));
       },
@@ -330,6 +338,18 @@ void main() {
         final text = await service.generateContentWithContinuation(
           prompt: 'test prompt',
           autoContinueLimit: 0,
+        );
+        expect(text, equals('Simple content'));
+      },
+    );
+
+    test(
+      'generateContentWithContinuation handles negative autoContinueLimit values (e.g. -1)',
+      () async {
+        final service = TestFakeAiService()..mockContent = 'Simple content';
+        final text = await service.generateContentWithContinuation(
+          prompt: 'test prompt',
+          autoContinueLimit: -1,
         );
         expect(text, equals('Simple content'));
       },
