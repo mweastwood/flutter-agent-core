@@ -212,6 +212,7 @@ void main() {
 
           expect(async.elapsed, equals(Duration.zero));
           expect(limiter.requestTimestamps.length, equals(3));
+          expect(limiter.tokenUsage.length, equals(3));
         });
       },
     );
@@ -237,6 +238,8 @@ void main() {
         limiter.throttleBeforeRequest(10);
 
         expect(async.elapsed, equals(Duration.zero));
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(limiter.tokenUsage.length, equals(1));
       });
     });
 

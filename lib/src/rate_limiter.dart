@@ -12,6 +12,10 @@ class RateLimiter {
   final List<DateTime> _requestTimestamps = [];
   final List<({DateTime timestamp, int tokenCount})> _tokenUsage = [];
 
+  /// Creates a new [RateLimiter] instance.
+  ///
+  /// The [nowProvider] parameter is an optional callback returning a [DateTime],
+  /// providing a dependency injection point for clock control during testing.
   RateLimiter({
     required this.modelInfo,
     this.throttlePercentage = 100.0,
