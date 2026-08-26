@@ -11,7 +11,7 @@ class MockAiService extends AiService {
   /// Default delay for simulated download operations in [triggerDownload].
   ///
   /// Defaults to [Duration.zero] if not specified.
-  final Duration downloadDelay;
+  Duration downloadDelay;
 
   MockAiService({this.downloadDelay = Duration.zero});
 
@@ -40,21 +40,21 @@ class MockAiService extends AiService {
     if (_status == AiCoreStatus.downloadable) {
       _status = AiCoreStatus.downloading;
       final effectiveDelay = delay ?? downloadDelay;
-      _activeDownloadFuture = _runDownload(effectiveDelay);
-      return _activeDownloadFuture!;
+      final future = _runDownload(effectiveDelay);
+      _activeDownloadFuture = future;
+      future.whenComplete(() {
+        _activeDownloadFuture = null;
+      });
+      return future;
     }
     return Future.value();
   }
 
   Future<void> _runDownload(Duration delay) async {
-    try {
-      if (delay > Duration.zero) {
-        await Future.delayed(delay);
-      }
-      _status = AiCoreStatus.available;
-    } finally {
-      _activeDownloadFuture = null;
+    if (delay > Duration.zero) {
+      await Future.delayed(delay);
     }
+    _status = AiCoreStatus.available;
   }
 
   @override

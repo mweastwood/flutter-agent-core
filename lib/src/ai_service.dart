@@ -43,10 +43,7 @@ abstract class AiService {
   Future<AiCoreStatus> checkStatus();
 
   /// Triggers a simulated or platform model download operation.
-  ///
-  /// Accepts an optional [delay] parameter to override default download delay
-  /// in mock or stub implementations.
-  Future<void> triggerDownload({Duration? delay});
+  Future<void> triggerDownload();
   Future<void> setModelConfig({
     required String releaseStage,
     required String preference,

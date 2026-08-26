@@ -77,18 +77,42 @@ void main() {
     );
 
     test(
-      'triggerDownload works via polymorphic AiService reference with optional delay',
+      'triggerDownload works via polymorphic AiService reference',
       () async {
         final AiService service = MockAiService(
           downloadDelay: const Duration(milliseconds: 50),
         );
         (service as MockAiService).setMockStatus(AiCoreStatus.downloadable);
 
-        final downloadFuture = service.triggerDownload(delay: Duration.zero);
+        final downloadFuture = service.triggerDownload();
         await downloadFuture;
         expect(await service.checkStatus(), equals(AiCoreStatus.available));
       },
     );
+
+    test(
+      'triggerDownload can be re-triggered after zero-delay download completes',
+      () async {
+        final service = MockAiService(downloadDelay: Duration.zero);
+        service.setMockStatus(AiCoreStatus.downloadable);
+
+        await service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+
+        service.setMockStatus(AiCoreStatus.downloadable);
+        expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
+
+        await service.triggerDownload();
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
+
+    test('MockAiService downloadDelay is mutable', () {
+      final service = MockAiService(downloadDelay: Duration.zero);
+      expect(service.downloadDelay, equals(Duration.zero));
+      service.downloadDelay = const Duration(seconds: 5);
+      expect(service.downloadDelay, equals(const Duration(seconds: 5)));
+    });
 
     test(
       'triggerDownload does nothing if status is not downloadable',
