@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import 'ai_service.dart';
 
 import 'model_database.dart';
@@ -49,7 +51,11 @@ class CloudAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload() async {}
+  Future<void> triggerDownload({Duration? delay}) async {
+    if (delay != null) {
+      await Future.delayed(delay);
+    }
+  }
 
   @override
   Future<void> setModelConfig({

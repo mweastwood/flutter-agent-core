@@ -93,9 +93,13 @@ class LocalAgentPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
             "triggerDownload" -> {
+                val delayMs = call.argument<Number>("delayMs")?.toLong()
                 val model = getModel(call)
                 ioScope.launch {
                     try {
+                        if (delayMs != null && delayMs > 0) {
+                            kotlinx.coroutines.delay(delayMs)
+                        }
                         model.download().collect { downloadStatus ->
                             Log.d("LocalAgentPlugin", "Download status: $downloadStatus")
                         }

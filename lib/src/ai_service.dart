@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -42,7 +43,7 @@ abstract class AiService {
   Future<AiCoreStatus> checkStatus();
 
   /// Triggers on-demand downloading of the AI model assets.
-  Future<void> triggerDownload();
+  Future<void> triggerDownload({Duration? delay});
   Future<void> setModelConfig({
     required String releaseStage,
     required String preference,
