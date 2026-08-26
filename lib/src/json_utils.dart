@@ -11,17 +11,15 @@ String stripMarkdownCodeFences(String text) {
   // Single-line code fence: ```json {"key": "value"}``` or ```{"key": "value"}```
   if (!cleaned.contains('\n')) {
     // Check for both opening and closing fence on a single line
-    final singleLineMatch = RegExp(
-      r'^```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```$',
-    ).firstMatch(cleaned);
+    final singleLineMatch = RegExp(r'^```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```$')
+        .firstMatch(cleaned);
     if (singleLineMatch != null) {
       return singleLineMatch.group(1)!.trim();
     }
     // Single line with unclosed opening fence: ```json {"key": "value"}
     if (cleaned.startsWith('```')) {
-      final unclosedMatch = RegExp(
-        r'^```[a-zA-Z0-9_-]*\s*(.*)$',
-      ).firstMatch(cleaned);
+      final unclosedMatch = RegExp(r'^```[a-zA-Z0-9_-]*\s*(.*)$')
+          .firstMatch(cleaned);
       if (unclosedMatch != null) {
         return unclosedMatch.group(1)!.trim();
       }
