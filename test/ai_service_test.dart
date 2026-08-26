@@ -17,7 +17,7 @@ class TestFakeAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload({Duration? delay}) async {}
+  Future<void> triggerDownload() async {}
 
   @override
   Future<void> setModelConfig({
@@ -61,7 +61,7 @@ class TestContinuationAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload({Duration? delay}) async {}
+  Future<void> triggerDownload() async {}
 
   @override
   Future<void> setModelConfig({
@@ -336,27 +336,29 @@ void main() {
 
   group('MockAiService Tests', () {
     test(
-      'triggerDownload with default delay transitions status to downloading when downloadable',
+      'triggerDownload with configurable downloadDelay transitions status to downloading and then available',
       () async {
         final service = MockAiService();
         service.setMockStatus(AiCoreStatus.downloadable);
+        service.downloadDelay = const Duration(milliseconds: 10);
         expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
 
-        await service.triggerDownload();
+        final future = service.triggerDownload();
         expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+
+        await future;
+        expect(await service.checkStatus(), equals(AiCoreStatus.available));
       },
     );
 
     test(
-      'triggerDownload with custom delay transitions status to downloading and then available',
+      'triggerDownload with zero downloadDelay transitions status to available when awaited',
       () async {
         final service = MockAiService();
         service.setMockStatus(AiCoreStatus.downloadable);
+        service.downloadDelay = Duration.zero;
 
-        await service.triggerDownload(delay: const Duration(milliseconds: 10));
-        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
-
-        await Future.delayed(const Duration(milliseconds: 20));
+        await service.triggerDownload();
         expect(await service.checkStatus(), equals(AiCoreStatus.available));
       },
     );

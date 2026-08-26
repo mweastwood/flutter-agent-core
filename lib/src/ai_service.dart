@@ -42,10 +42,7 @@ abstract class AiService {
   Future<AiCoreStatus> checkStatus();
 
   /// Triggers on-demand downloading of the AI model assets.
-  ///
-  /// The optional [delay] parameter allows test implementations (such as [MockAiService])
-  /// to customize download simulation durations.
-  Future<void> triggerDownload({Duration? delay});
+  Future<void> triggerDownload();
   Future<void> setModelConfig({
     required String releaseStage,
     required String preference,

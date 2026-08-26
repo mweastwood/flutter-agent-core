@@ -15,7 +15,7 @@ class TestMockAiService extends AiService {
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
 
   @override
-  Future<void> triggerDownload({Duration? delay}) async {}
+  Future<void> triggerDownload() async {}
 
   @override
   Future<void> setModelConfig({
@@ -1088,7 +1088,7 @@ class _HeuristicMockAiService extends AiService {
   @override
   Future<AiCoreStatus> checkStatus() async => AiCoreStatus.available;
   @override
-  Future<void> triggerDownload({Duration? delay}) async {}
+  Future<void> triggerDownload() async {}
   @override
   Future<void> setModelConfig({
     required String releaseStage,

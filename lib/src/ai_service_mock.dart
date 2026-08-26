@@ -6,6 +6,9 @@ import 'ai_service.dart';
 class MockAiService extends AiService {
   AiCoreStatus _status = AiCoreStatus.available;
 
+  /// Duration to simulate model downloading delay in MockAiService.
+  Duration downloadDelay = const Duration(seconds: 2);
+
   @override
   Future<AiCoreStatus> checkStatus() async {
     return _status;
@@ -16,12 +19,13 @@ class MockAiService extends AiService {
   }
 
   @override
-  Future<void> triggerDownload({Duration? delay}) async {
+  Future<void> triggerDownload() async {
     if (_status == AiCoreStatus.downloadable) {
       _status = AiCoreStatus.downloading;
-      Future.delayed(delay ?? const Duration(seconds: 2), () {
-        _status = AiCoreStatus.available;
-      });
+      if (downloadDelay > Duration.zero) {
+        await Future.delayed(downloadDelay);
+      }
+      _status = AiCoreStatus.available;
     }
   }
 
