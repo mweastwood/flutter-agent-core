@@ -338,9 +338,10 @@ void main() {
     test(
       'triggerDownload with configurable downloadDelay transitions status to downloading and then available',
       () async {
-        final service = MockAiService();
+        final service = MockAiService(
+          downloadDelay: const Duration(milliseconds: 10),
+        );
         service.setMockStatus(AiCoreStatus.downloadable);
-        service.downloadDelay = const Duration(milliseconds: 10);
         expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
 
         final future = service.triggerDownload();
@@ -354,9 +355,8 @@ void main() {
     test(
       'triggerDownload with zero downloadDelay transitions status to available when awaited',
       () async {
-        final service = MockAiService();
+        final service = MockAiService(downloadDelay: Duration.zero);
         service.setMockStatus(AiCoreStatus.downloadable);
-        service.downloadDelay = Duration.zero;
 
         await service.triggerDownload();
         expect(await service.checkStatus(), equals(AiCoreStatus.available));

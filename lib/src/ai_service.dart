@@ -41,6 +41,7 @@ class AiResponse {
 
 abstract class AiService {
   Future<AiCoreStatus> checkStatus();
+
   /// Triggers a simulated or platform model download operation.
   ///
   /// Accepts an optional [delay] parameter to override default download delay
