@@ -53,6 +53,7 @@ class TestMockAiService extends AiService {
 class _RawStringMockAiService extends AiService {
   final List<String?> rawResponses;
   int callCount = 0;
+  final List<String> capturedPrompts = [];
 
   _RawStringMockAiService(this.rawResponses);
 
@@ -75,6 +76,7 @@ class _RawStringMockAiService extends AiService {
     double temperature = 1.0,
     int? maxOutputTokens,
   }) async {
+    capturedPrompts.add(prompt);
     if (callCount < rawResponses.length) {
       return rawResponses[callCount++];
     }
@@ -256,6 +258,7 @@ void main() {
         expect(steps.length, equals(1));
         expect(steps[0].feedback, equals('Error: Custom API Error'));
         expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
       },
     );
 
@@ -296,9 +299,10 @@ void main() {
           {'action': 'increment', 'tool': 'inc'},
           {'error': 'Server overloaded'},
         ]);
+        final errorDelegate = MockTextAgentDelegate();
         final errorHarness = AgentHarness<TestStepResult>(
           aiService: errorMockAi,
-          delegate: delegate,
+          delegate: errorDelegate,
         );
         final errorRecordedSteps = <int>[];
         final errorRecordedResults = <TestStepResult>[];
