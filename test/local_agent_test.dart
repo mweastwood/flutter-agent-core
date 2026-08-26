@@ -434,6 +434,287 @@ void main() {
         equals({'releaseStage': 'preview', 'preference': 'fast'}),
       );
     });
+
+    test('setModelConfig handles exceptions gracefully', () async {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+            throw PlatformException(code: 'ERROR', message: 'Failed to set config');
+          });
+      final service = MethodChannelAiService();
+      await expectLater(
+        service.setModelConfig(releaseStage: 'preview', preference: 'fast'),
+        completes,
+      );
+    });
+
+    group('checkStatus', () {
+      test('maps available status correctly', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'available';
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.available));
+      });
+
+      test('maps downloading status correctly', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'downloading';
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.downloading));
+      });
+
+      test('maps downloadable status correctly', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'downloadable';
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.downloadable));
+      });
+
+      test('maps unknown string status to unavailable', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'unknown_status';
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.unavailable));
+      });
+
+      test('maps null status to unavailable', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return null;
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.unavailable));
+      });
+
+      test('catches exception and returns unavailable', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              throw PlatformException(code: 'UNAVAILABLE', message: 'Not supported');
+            });
+        final service = MethodChannelAiService();
+        final status = await service.checkStatus();
+        expect(status, equals(AiCoreStatus.unavailable));
+      });
+    });
+
+    group('triggerDownload', () {
+      test('invokes method channel triggerDownload', () async {
+        final service = MethodChannelAiService();
+        await service.triggerDownload();
+
+        expect(log.length, equals(1));
+        expect(log.first.method, equals('triggerDownload'));
+      });
+
+      test('catches exception during triggerDownload without crashing', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              throw PlatformException(code: 'DOWNLOAD_ERROR', message: 'Network failed');
+            });
+        final service = MethodChannelAiService();
+        await expectLater(service.triggerDownload(), completes);
+      });
+    });
+
+    group('countTokens', () {
+      test('passes through token count returned by channel', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              log.add(methodCall);
+              if (methodCall.method == 'countTokens') {
+                return 42;
+              }
+              return null;
+            });
+        final service = MethodChannelAiService();
+        final img = Uint8List.fromList([1, 2, 3]);
+        final count = await service.countTokens(prompt: 'hello', imageBytes: img);
+
+        expect(count, equals(42));
+        expect(log.first.method, equals('countTokens'));
+        expect(log.first.arguments, equals({'prompt': 'hello', 'image': img}));
+      });
+
+      test('returns 0 when channel returns null', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return null;
+            });
+        final service = MethodChannelAiService();
+        final count = await service.countTokens(prompt: 'hello');
+        expect(count, equals(0));
+      });
+
+      test('catches exception and returns 0', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              throw PlatformException(code: 'ERROR', message: 'Failed to count tokens');
+            });
+        final service = MethodChannelAiService();
+        final count = await service.countTokens(prompt: 'hello');
+        expect(count, equals(0));
+      });
+    });
+
+    group('generateContentRaw and generateContent', () {
+      test('parses Map response with text and isTruncated', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              log.add(methodCall);
+              return {
+                'text': 'Generated text from map',
+                'isTruncated': true,
+              };
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(
+          prompt: 'test prompt',
+          temperature: 0.7,
+          maxOutputTokens: 100,
+        );
+
+        expect(response, isNotNull);
+        expect(response!.text, equals('Generated text from map'));
+        expect(response.isTruncated, isTrue);
+        expect(response.isError, isFalse);
+
+        expect(log.first.method, equals('generateContent'));
+        expect(log.first.arguments['prompt'], equals('test prompt'));
+        expect(log.first.arguments['temperature'], equals(0.7));
+        expect(log.first.arguments['maxOutputTokens'], equals(100));
+      });
+
+      test('parses Map response with default isTruncated false when omitted', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return {'text': 'Map without isTruncated'};
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+
+        expect(response, isNotNull);
+        expect(response!.text, equals('Map without isTruncated'));
+        expect(response.isTruncated, isFalse);
+        expect(response.isError, isFalse);
+      });
+
+      test('parses String response', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'Generated string response';
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+
+        expect(response, isNotNull);
+        expect(response!.text, equals('Generated string response'));
+        expect(response.isTruncated, isFalse);
+        expect(response.isError, isFalse);
+      });
+
+      test('returns null when channel returns null without error', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return null;
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+        expect(response, isNull);
+      });
+
+      test('returns null when Map response contains null text', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return {'text': null, 'isTruncated': false};
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+        expect(response, isNull);
+      });
+
+      test('retries up to 4 attempts on channel exception and succeeds', () async {
+        int attempts = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              attempts++;
+              if (attempts < 3) {
+                throw PlatformException(code: 'TEMPORARY_ERROR', message: 'Try again');
+              }
+              return 'Success on attempt 3';
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+
+        expect(attempts, equals(3));
+        expect(response, isNotNull);
+        expect(response!.text, equals('Success on attempt 3'));
+        expect(response.isError, isFalse);
+      });
+
+      test('returns error JSON with isError true when all 4 attempts fail', () async {
+        int attempts = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              attempts++;
+              throw PlatformException(code: 'CHANNEL_FAILED', message: 'Failed "attempt"');
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+
+        expect(attempts, equals(4));
+        expect(response, isNotNull);
+        expect(response!.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        expect(response.text, contains('"error"'));
+        expect(response.text, contains('PlatformException(CHANNEL_FAILED, Failed \\"attempt\\", null, null)'));
+      });
+
+      test('generateContent calls generateContentRaw and returns text string', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return 'Content string';
+            });
+        final service = MethodChannelAiService();
+        final text = await service.generateContent(prompt: 'test prompt');
+        expect(text, equals('Content string'));
+      });
+
+      test('generateContent returns null when generateContentRaw returns null', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return null;
+            });
+        final service = MethodChannelAiService();
+        final text = await service.generateContent(prompt: 'test prompt');
+        expect(text, isNull);
+      });
+
+      test('catches outer exception when response parsing throws TypeError', () async {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              return {'text': 123}; // 123 is not String?, throws TypeError on cast
+            });
+        final service = MethodChannelAiService();
+        final response = await service.generateContentRaw(prompt: 'test prompt');
+
+        expect(response, isNotNull);
+        expect(response!.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        expect(response.text, contains('"error"'));
+      });
+    });
   });
 
   group('Auto-Continuation Tests', () {
