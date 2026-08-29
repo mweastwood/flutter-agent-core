@@ -116,10 +116,7 @@ enum _ObjectState {
   expectingCommaOrClose,
 }
 
-enum _ArrayState {
-  expectingValue,
-  expectingCommaOrClose,
-}
+enum _ArrayState { expectingValue, expectingCommaOrClose }
 
 class _StackFrame {
   final _ContainerType type;
@@ -129,16 +126,16 @@ class _StackFrame {
   int lastCommaPos;
 
   _StackFrame.object(this.lastCompleteEntryEndPos)
-      : type = _ContainerType.object,
-        objectState = _ObjectState.expectingKey,
-        arrayState = _ArrayState.expectingValue,
-        lastCommaPos = -1;
+    : type = _ContainerType.object,
+      objectState = _ObjectState.expectingKey,
+      arrayState = _ArrayState.expectingValue,
+      lastCommaPos = -1;
 
   _StackFrame.array(this.lastCompleteEntryEndPos)
-      : type = _ContainerType.array,
-        objectState = _ObjectState.expectingKey,
-        arrayState = _ArrayState.expectingValue,
-        lastCommaPos = -1;
+    : type = _ContainerType.array,
+      objectState = _ObjectState.expectingKey,
+      arrayState = _ArrayState.expectingValue,
+      lastCommaPos = -1;
 }
 
 @visibleForTesting

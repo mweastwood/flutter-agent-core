@@ -65,7 +65,10 @@ void main() {
       const singleKeyDanglingColon = '{"key": ';
       final repairedSingleKeyDangling = repairJson(singleKeyDanglingColon);
       expect(repairedSingleKeyDangling, equals('{}'));
-      expect(jsonDecode(repairedSingleKeyDangling), equals(<String, dynamic>{}));
+      expect(
+        jsonDecode(repairedSingleKeyDangling),
+        equals(<String, dynamic>{}),
+      );
 
       const singleKeyDanglingNoSpace = '{"key":';
       final repairedSingleKeyNoSpace = repairJson(singleKeyDanglingNoSpace);
@@ -85,7 +88,10 @@ void main() {
       const singleKeyUnclosed = '{"key';
       final repairedSingleKeyUnclosed = repairJson(singleKeyUnclosed);
       expect(repairedSingleKeyUnclosed, equals('{}'));
-      expect(jsonDecode(repairedSingleKeyUnclosed), equals(<String, dynamic>{}));
+      expect(
+        jsonDecode(repairedSingleKeyUnclosed),
+        equals(<String, dynamic>{}),
+      );
 
       const trailingCommaOnly = '{"a": 1, ';
       final repairedTrailingComma = repairJson(trailingCommaOnly);
@@ -108,9 +114,7 @@ void main() {
       expect(
         jsonDecode(repairedNestedListDangling),
         equals({
-          'items': [
-            <String, dynamic>{},
-          ],
+          'items': [<String, dynamic>{}],
         }),
       );
     });
