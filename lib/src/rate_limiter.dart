@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 
@@ -9,8 +10,10 @@ class RateLimiter {
   final CloudModelInfo modelInfo;
   final DateTime Function() _now;
 
-  final List<DateTime> _requestTimestamps = [];
-  final List<({DateTime timestamp, int tokenCount})> _tokenUsage = [];
+  final Queue<DateTime> _requestTimestamps = Queue<DateTime>();
+  final Queue<({DateTime timestamp, int tokenCount})> _tokenUsage =
+      Queue<({DateTime timestamp, int tokenCount})>();
+  int _runningTokenSum = 0;
 
   /// Creates a new [RateLimiter] instance.
   ///
@@ -33,6 +36,25 @@ class RateLimiter {
   void recordRequestForTesting(DateTime timestamp, {int tokenCount = 0}) {
     _requestTimestamps.add(timestamp);
     _tokenUsage.add((timestamp: timestamp, tokenCount: tokenCount));
+    _runningTokenSum += tokenCount;
+  }
+
+  void _pruneExpiredRequests(DateTime now, Duration window) {
+    while (_requestTimestamps.isNotEmpty &&
+        now.difference(_requestTimestamps.first) > window) {
+      _requestTimestamps.removeFirst();
+    }
+  }
+
+  void _pruneExpiredTokens(DateTime now, Duration window) {
+    while (_tokenUsage.isNotEmpty &&
+        now.difference(_tokenUsage.first.timestamp) > window) {
+      final removed = _tokenUsage.removeFirst();
+      _runningTokenSum = (_runningTokenSum - removed.tokenCount).clamp(
+        0,
+        1 << 62,
+      );
+    }
   }
 
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
@@ -43,18 +65,15 @@ class RateLimiter {
         timestamp: actualRequestTime,
         tokenCount: estimatedTokens,
       ));
+      _runningTokenSum += estimatedTokens;
       return;
     }
 
     final now = _now();
     final double pctFactor = throttlePercentage / 100.0;
 
-    _requestTimestamps.removeWhere(
-      (dt) => now.difference(dt) > const Duration(minutes: 1),
-    );
-    _tokenUsage.removeWhere(
-      (item) => now.difference(item.timestamp) > const Duration(minutes: 1),
-    );
+    _pruneExpiredRequests(now, const Duration(minutes: 1));
+    _pruneExpiredTokens(now, const Duration(minutes: 1));
 
     if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
       final double effectiveRps = modelInfo.limitRps! * pctFactor;
@@ -80,9 +99,7 @@ class RateLimiter {
       final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
       while (true) {
         final checkTime = _now();
-        _requestTimestamps.removeWhere(
-          (dt) => checkTime.difference(dt) > const Duration(minutes: 1),
-        );
+        _pruneExpiredRequests(checkTime, const Duration(minutes: 1));
         if (_requestTimestamps.length < effectiveRpm) {
           break;
         }
@@ -102,16 +119,9 @@ class RateLimiter {
       final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
       while (true) {
         final checkTime = _now();
-        _tokenUsage.removeWhere(
-          (item) =>
-              checkTime.difference(item.timestamp) > const Duration(minutes: 1),
-        );
-        final recentTokens = _tokenUsage.fold<int>(
-          0,
-          (sum, item) => sum + item.tokenCount,
-        );
+        _pruneExpiredTokens(checkTime, const Duration(minutes: 1));
 
-        if (recentTokens + estimatedTokens <= effectiveTpm) {
+        if (_runningTokenSum + estimatedTokens <= effectiveTpm) {
           break;
         }
         if (_tokenUsage.isEmpty) break;
@@ -132,5 +142,6 @@ class RateLimiter {
       timestamp: actualRequestTime,
       tokenCount: estimatedTokens,
     ));
+    _runningTokenSum += estimatedTokens;
   }
 }

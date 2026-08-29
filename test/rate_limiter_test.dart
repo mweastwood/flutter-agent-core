@@ -383,5 +383,138 @@ void main() {
         });
       },
     );
+
+    test(
+      'FIFO pruning correctly drains multiple expired timestamps and token items in order',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-fifo-prune-model',
+            provider: CloudProvider.gemini,
+            limitRpm: 10,
+            limitTpm: 1000,
+            description: 'Test FIFO pruning',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Add 5 entries spanning from 3 minutes ago to 30 seconds ago
+          final tMinus180 = clock.now().subtract(const Duration(seconds: 180));
+          final tMinus120 = clock.now().subtract(const Duration(seconds: 120));
+          final tMinus90 = clock.now().subtract(const Duration(seconds: 90));
+          final tMinus61 = clock.now().subtract(const Duration(seconds: 61));
+          final tMinus30 = clock.now().subtract(const Duration(seconds: 30));
+
+          limiter.recordRequestForTesting(tMinus180, tokenCount: 100);
+          limiter.recordRequestForTesting(tMinus120, tokenCount: 100);
+          limiter.recordRequestForTesting(tMinus90, tokenCount: 100);
+          limiter.recordRequestForTesting(tMinus61, tokenCount: 100);
+          limiter.recordRequestForTesting(tMinus30, tokenCount: 100);
+
+          expect(limiter.requestTimestamps.length, equals(5));
+          expect(limiter.tokenUsage.length, equals(5));
+
+          // Next request will trigger pruning of everything older than 1 minute
+          limiter.throttleBeforeRequest(50);
+
+          // Remaining: tMinus30 and the new request at clock.now()
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.requestTimestamps.first, equals(tMinus30));
+          expect(limiter.requestTimestamps.last, equals(clock.now()));
+
+          expect(limiter.tokenUsage.length, equals(2));
+          expect(limiter.tokenUsage.first.timestamp, equals(tMinus30));
+          expect(limiter.tokenUsage.first.tokenCount, equals(100));
+          expect(limiter.tokenUsage.last.timestamp, equals(clock.now()));
+          expect(limiter.tokenUsage.last.tokenCount, equals(50));
+        });
+      },
+    );
+
+    test(
+      'Running token counter accurately reflects sliding window token count and enforces TPM across sliding windows',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-running-token-model',
+            provider: CloudProvider.gemini,
+            limitTpm: 300,
+            description: 'Test running token counter',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Make 3 requests consuming 100 tokens each at t = 0, 10s, 20s
+          limiter.throttleBeforeRequest(100);
+          async.elapse(const Duration(seconds: 10));
+          limiter.throttleBeforeRequest(100);
+          async.elapse(const Duration(seconds: 10));
+          limiter.throttleBeforeRequest(100);
+
+          expect(limiter.tokenUsage.length, equals(3));
+
+          // Next request of 50 tokens would exceed limitTpm (300 + 50 > 300)
+          // It should wait until the first 100-token request expires (at t = 60.1s total, i.e. 40.1s from current t = 20s)
+          limiter.throttleBeforeRequest(50);
+          expect(async.elapsed, equals(const Duration(seconds: 20)));
+
+          async.elapse(
+            const Duration(seconds: 41),
+          ); // advance past the first window
+          expect(
+            limiter.tokenUsage.length,
+            equals(3),
+          ); // first expired, 2 remaining + 1 new
+          expect(limiter.tokenUsage.last.tokenCount, equals(50));
+        });
+      },
+    );
+
+    test(
+      'High-throughput burst scenarios maintain correct RPM throttling and prune efficiently',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-burst-model',
+            provider: CloudProvider.gemini,
+            limitRpm: 5,
+            description: 'Test high-throughput burst',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire 5 requests immediately
+          for (int i = 0; i < 5; i++) {
+            limiter.throttleBeforeRequest(10);
+          }
+          expect(limiter.requestTimestamps.length, equals(5));
+
+          // The 6th request must wait for the 1st request to expire (60.1s)
+          limiter.throttleBeforeRequest(10);
+          async.elapse(const Duration(seconds: 61));
+
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(
+            limiter.requestTimestamps.first,
+            equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
+          );
+        });
+      },
+    );
   });
 }
