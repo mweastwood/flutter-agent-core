@@ -384,6 +384,82 @@ void main() {
       expect(roundTrip.imageMimeType, equals('image/bmp'));
     });
 
+    test(
+      'fromJson safely handles image map with metadata only (missing base64)',
+      () {
+        final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
+        final jsonMap = {
+          'timestamp': timestamp.toIso8601String(),
+          'prompt': 'Analyze screenshot',
+          'response': 'Done',
+          'isError': false,
+          'image': {'mimeType': 'image/png'},
+        };
+
+        final entry = AgentHistoryEntry.fromJson(jsonMap);
+        expect(entry.timestamp, equals(timestamp));
+        expect(entry.prompt, equals('Analyze screenshot'));
+        expect(entry.response, equals('Done'));
+        expect(entry.isError, isFalse);
+        expect(entry.imageBytes, isNull);
+        expect(entry.imageMimeType, equals('image/png'));
+      },
+    );
+
+    test('fromJson safely handles image map with explicit null base64', () {
+      final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
+      final jsonMap = {
+        'timestamp': timestamp.toIso8601String(),
+        'prompt': 'Analyze screenshot',
+        'response': 'Done',
+        'isError': false,
+        'image': {'mimeType': 'image/png', 'base64': null},
+      };
+
+      final entry = AgentHistoryEntry.fromJson(jsonMap);
+      expect(entry.timestamp, equals(timestamp));
+      expect(entry.prompt, equals('Analyze screenshot'));
+      expect(entry.response, equals('Done'));
+      expect(entry.isError, isFalse);
+      expect(entry.imageBytes, isNull);
+      expect(entry.imageMimeType, equals('image/png'));
+    });
+
+    test(
+      'fromJson safely defaults imageMimeType when image map omits or has non-string mimeType',
+      () {
+        final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
+        final jsonMapWithoutMimeType = {
+          'timestamp': timestamp.toIso8601String(),
+          'prompt': 'Analyze screenshot',
+          'response': 'Done',
+          'isError': false,
+          'image': {
+            'base64': base64Encode([4, 5, 6]),
+          },
+        };
+
+        final entry1 = AgentHistoryEntry.fromJson(jsonMapWithoutMimeType);
+        expect(entry1.imageBytes, equals(Uint8List.fromList([4, 5, 6])));
+        expect(entry1.imageMimeType, equals('image/bmp'));
+
+        final jsonMapWithNullMimeType = {
+          'timestamp': timestamp.toIso8601String(),
+          'prompt': 'Analyze screenshot',
+          'response': 'Done',
+          'isError': false,
+          'image': {
+            'mimeType': null,
+            'base64': base64Encode([7, 8, 9]),
+          },
+        };
+
+        final entry2 = AgentHistoryEntry.fromJson(jsonMapWithNullMimeType);
+        expect(entry2.imageBytes, equals(Uint8List.fromList([7, 8, 9])));
+        expect(entry2.imageMimeType, equals('image/bmp'));
+      },
+    );
+
     test('serializeList formats valid JSON indent', () {
       final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
       final entries = [
