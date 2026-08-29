@@ -65,8 +65,13 @@ class AgentHarness<T> {
         parsed = {'error': e.toString(), 'rawResponse': responseText};
       }
 
-      if (parsed.containsKey('error')) {
-        final errorMsg = parsed['error'] ?? 'AI service returned error';
+      final errorVal = parsed['error'];
+      final hasError =
+          errorVal != null &&
+          errorVal != false &&
+          (errorVal is! String || errorVal.trim().isNotEmpty);
+      if (hasError) {
+        final errorMsg = errorVal.toString();
         final errorResult = delegate.parseStepResult(
           parsed,
           'Error: $errorMsg',
