@@ -107,84 +107,236 @@ String stitchContinuation(String text, String nextText) {
   return text + nextText;
 }
 
+enum _ContainerType { object, array }
+
+enum _ObjectState {
+  expectingKey,
+  expectingColon,
+  expectingValue,
+  expectingCommaOrClose,
+}
+
+enum _ArrayState {
+  expectingValue,
+  expectingCommaOrClose,
+}
+
+class _StackFrame {
+  final _ContainerType type;
+  _ObjectState objectState;
+  _ArrayState arrayState;
+  int lastCompleteEntryEndPos;
+  int lastCommaPos;
+
+  _StackFrame.object(this.lastCompleteEntryEndPos)
+      : type = _ContainerType.object,
+        objectState = _ObjectState.expectingKey,
+        arrayState = _ArrayState.expectingValue,
+        lastCommaPos = -1;
+
+  _StackFrame.array(this.lastCompleteEntryEndPos)
+      : type = _ContainerType.array,
+        objectState = _ObjectState.expectingKey,
+        arrayState = _ArrayState.expectingValue,
+        lastCommaPos = -1;
+}
+
 @visibleForTesting
 String repairJson(String json) {
-  var inString = false;
-  var escape = false;
-  final stack = <String>[];
-  final result = StringBuffer();
+  if (json.isEmpty) return '';
 
-  for (var i = 0; i < json.length; i++) {
+  final stack = <_StackFrame>[];
+  final output = <String>[];
+
+  void onValueCompleted(int endPos) {
+    if (stack.isNotEmpty) {
+      final top = stack.last;
+      if (top.type == _ContainerType.object) {
+        top.objectState = _ObjectState.expectingCommaOrClose;
+        top.lastCompleteEntryEndPos = endPos;
+      } else {
+        top.arrayState = _ArrayState.expectingCommaOrClose;
+        top.lastCompleteEntryEndPos = endPos;
+      }
+    }
+  }
+
+  var i = 0;
+  while (i < json.length) {
     final char = json[i];
-    if (escape) {
-      escape = false;
-      result.write(char);
+
+    if (char == ' ' || char == '\t' || char == '\r' || char == '\n') {
+      output.add(char);
+      i++;
       continue;
     }
-    if (char == '\\') {
-      escape = true;
-      result.write(char);
-      continue;
-    }
+
     if (char == '"') {
-      inString = !inString;
-      result.write(char);
+      output.add('"');
+      i++;
+      var escape = false;
+      var stringClosed = false;
+      while (i < json.length) {
+        final strChar = json[i];
+        output.add(strChar);
+        i++;
+        if (escape) {
+          escape = false;
+        } else if (strChar == r'\') {
+          escape = true;
+        } else if (strChar == '"') {
+          stringClosed = true;
+          break;
+        }
+      }
+
+      if (!stringClosed) {
+        if (escape) {
+          output.add(r'\');
+        }
+        output.add('"');
+      }
+
+      if (stack.isNotEmpty) {
+        final top = stack.last;
+        if (top.type == _ContainerType.object) {
+          if (top.objectState == _ObjectState.expectingKey) {
+            top.objectState = _ObjectState.expectingColon;
+          } else if (top.objectState == _ObjectState.expectingValue) {
+            top.objectState = _ObjectState.expectingCommaOrClose;
+            top.lastCompleteEntryEndPos = output.length;
+          }
+        } else {
+          if (top.arrayState == _ArrayState.expectingValue) {
+            top.arrayState = _ArrayState.expectingCommaOrClose;
+            top.lastCompleteEntryEndPos = output.length;
+          }
+        }
+      }
       continue;
     }
-    if (inString) {
-      result.write(char);
+
+    if (char == '{') {
+      output.add('{');
+      i++;
+      stack.add(_StackFrame.object(output.length));
       continue;
     }
 
-    if (char == '{' || char == '[') {
-      stack.add(char);
-      result.write(char);
-    } else if (char == '}') {
-      if (stack.isNotEmpty && stack.last == '{') {
-        stack.removeLast();
-      }
-      result.write(char);
-    } else if (char == ']') {
-      while (stack.isNotEmpty && stack.last == '{') {
-        result.write('}');
-        stack.removeLast();
-      }
-      if (stack.isNotEmpty && stack.last == '[') {
-        stack.removeLast();
-      }
-      result.write(char);
-    } else {
-      result.write(char);
+    if (char == '[') {
+      output.add('[');
+      i++;
+      stack.add(_StackFrame.array(output.length));
+      continue;
     }
-  }
 
-  if (escape) {
-    result.write(r'\');
-  }
-  if (inString) {
-    result.write('"');
-  }
-
-  var repaired = result.toString();
-  if (stack.isNotEmpty) {
-    var trimmed = repaired.trimRight();
-    while (trimmed.endsWith(',') || trimmed.endsWith(':')) {
-      trimmed = trimmed.substring(0, trimmed.length - 1).trimRight();
+    if (char == ':') {
+      output.add(':');
+      i++;
+      if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
+        if (stack.last.objectState == _ObjectState.expectingColon) {
+          stack.last.objectState = _ObjectState.expectingValue;
+        }
+      }
+      continue;
     }
-    repaired = trimmed;
+
+    if (char == ',') {
+      output.add(',');
+      i++;
+      if (stack.isNotEmpty) {
+        final top = stack.last;
+        top.lastCommaPos = output.length - 1;
+        if (top.type == _ContainerType.object) {
+          top.objectState = _ObjectState.expectingKey;
+        } else {
+          top.arrayState = _ArrayState.expectingValue;
+        }
+      }
+      continue;
+    }
+
+    if (char == '}') {
+      while (stack.isNotEmpty && stack.last.type != _ContainerType.object) {
+        final frame = stack.removeLast();
+        if (frame.arrayState == _ArrayState.expectingValue &&
+            frame.lastCommaPos != -1) {
+          output.length = frame.lastCompleteEntryEndPos;
+        }
+        output.add(']');
+      }
+
+      if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
+        stack.removeLast();
+        output.add('}');
+        i++;
+        onValueCompleted(output.length);
+      } else {
+        output.add('}');
+        i++;
+      }
+      continue;
+    }
+
+    if (char == ']') {
+      while (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
+        final frame = stack.removeLast();
+        if (frame.objectState != _ObjectState.expectingCommaOrClose) {
+          output.length = frame.lastCompleteEntryEndPos;
+        }
+        output.add('}');
+        if (stack.isNotEmpty) {
+          onValueCompleted(output.length);
+        }
+      }
+
+      if (stack.isNotEmpty && stack.last.type == _ContainerType.array) {
+        final frame = stack.removeLast();
+        if (frame.arrayState == _ArrayState.expectingValue &&
+            frame.lastCommaPos != -1) {
+          output.length = frame.lastCompleteEntryEndPos;
+        }
+        output.add(']');
+        i++;
+        onValueCompleted(output.length);
+      } else {
+        output.add(']');
+        i++;
+      }
+      continue;
+    }
+
+    // Literals (numbers, boolean, null)
+    while (i < json.length && !'{}[]:, \t\r\n"'.contains(json[i])) {
+      output.add(json[i]);
+      i++;
+    }
+    onValueCompleted(output.length);
   }
 
-  final closing = StringBuffer();
   while (stack.isNotEmpty) {
-    final open = stack.removeLast();
-    if (open == '{') {
-      closing.write('}');
-    } else if (open == '[') {
-      closing.write(']');
+    final frame = stack.removeLast();
+    if (frame.type == _ContainerType.object) {
+      if (frame.objectState != _ObjectState.expectingCommaOrClose) {
+        output.length = frame.lastCompleteEntryEndPos;
+      }
+      output.add('}');
+      if (stack.isNotEmpty) {
+        onValueCompleted(output.length);
+      }
+    } else {
+      if (frame.arrayState == _ArrayState.expectingValue &&
+          frame.lastCommaPos != -1) {
+        output.length = frame.lastCompleteEntryEndPos;
+      }
+      output.add(']');
+      if (stack.isNotEmpty) {
+        onValueCompleted(output.length);
+      }
     }
   }
 
-  return '$repaired$closing';
+  return output.join();
 }
 
 Future<String?> runWithAutoContinuation({

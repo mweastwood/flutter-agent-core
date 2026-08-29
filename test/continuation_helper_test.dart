@@ -51,11 +51,68 @@ void main() {
       );
     });
 
-    test('handles truncated dangling colons and commas', () {
-      const danglingColon = '{"a": 1, ';
-      final repairedColon = repairJson(danglingColon);
-      expect(repairedColon, equals('{"a": 1}'));
-      expect(jsonDecode(repairedColon), equals({'a': 1}));
+    test('handles truncated dangling colons and key truncations in maps', () {
+      const danglingColonWithSpace = '{"a": 1, "b": ';
+      final repairedColonWithSpace = repairJson(danglingColonWithSpace);
+      expect(repairedColonWithSpace, equals('{"a": 1}'));
+      expect(jsonDecode(repairedColonWithSpace), equals({'a': 1}));
+
+      const danglingColonNoSpace = '{"a": 1, "b":';
+      final repairedColonNoSpace = repairJson(danglingColonNoSpace);
+      expect(repairedColonNoSpace, equals('{"a": 1}'));
+      expect(jsonDecode(repairedColonNoSpace), equals({'a': 1}));
+
+      const singleKeyDanglingColon = '{"key": ';
+      final repairedSingleKeyDangling = repairJson(singleKeyDanglingColon);
+      expect(repairedSingleKeyDangling, equals('{}'));
+      expect(jsonDecode(repairedSingleKeyDangling), equals(<String, dynamic>{}));
+
+      const singleKeyDanglingNoSpace = '{"key":';
+      final repairedSingleKeyNoSpace = repairJson(singleKeyDanglingNoSpace);
+      expect(repairedSingleKeyNoSpace, equals('{}'));
+      expect(jsonDecode(repairedSingleKeyNoSpace), equals(<String, dynamic>{}));
+
+      const truncatedKeyWithQuotes = '{"a": 1, "b"';
+      final repairedKeyWithQuotes = repairJson(truncatedKeyWithQuotes);
+      expect(repairedKeyWithQuotes, equals('{"a": 1}'));
+      expect(jsonDecode(repairedKeyWithQuotes), equals({'a': 1}));
+
+      const truncatedKeyUnclosed = '{"a": 1, "b';
+      final repairedKeyUnclosed = repairJson(truncatedKeyUnclosed);
+      expect(repairedKeyUnclosed, equals('{"a": 1}'));
+      expect(jsonDecode(repairedKeyUnclosed), equals({'a': 1}));
+
+      const singleKeyUnclosed = '{"key';
+      final repairedSingleKeyUnclosed = repairJson(singleKeyUnclosed);
+      expect(repairedSingleKeyUnclosed, equals('{}'));
+      expect(jsonDecode(repairedSingleKeyUnclosed), equals(<String, dynamic>{}));
+
+      const trailingCommaOnly = '{"a": 1, ';
+      final repairedTrailingComma = repairJson(trailingCommaOnly);
+      expect(repairedTrailingComma, equals('{"a": 1}'));
+      expect(jsonDecode(repairedTrailingComma), equals({'a': 1}));
+
+      const nestedDanglingColon = '{"data": {"a": 1, "b": ';
+      final repairedNestedDangling = repairJson(nestedDanglingColon);
+      expect(repairedNestedDangling, equals('{"data": {"a": 1}}'));
+      expect(
+        jsonDecode(repairedNestedDangling),
+        equals({
+          'data': {'a': 1},
+        }),
+      );
+
+      const nestedListDanglingColon = '{"items": [{"name": ';
+      final repairedNestedListDangling = repairJson(nestedListDanglingColon);
+      expect(repairedNestedListDangling, equals('{"items": [{}]}'));
+      expect(
+        jsonDecode(repairedNestedListDangling),
+        equals({
+          'items': [
+            <String, dynamic>{},
+          ],
+        }),
+      );
     });
 
     test('preserves valid JSON strings and structures', () {
