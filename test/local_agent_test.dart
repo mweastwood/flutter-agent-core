@@ -1053,6 +1053,51 @@ void main() {
     );
 
     test(
+      'normalizes baseUrl with trailing slash and whitespace without double slashes in request URL',
+      () async {
+        final testCases = [
+          'https://api.openai.com/v1',
+          'https://api.openai.com/v1/',
+          'https://api.openai.com/v1///',
+          '  https://api.openai.com/v1/  ',
+          'https://open.bigmodel.cn/api/paas/v4/',
+        ];
+
+        for (final baseUrl in testCases) {
+          final expectedUrl =
+              '${baseUrl.trim().replaceAll(RegExp(r'/+$'), '')}/chat/completions';
+          final mockClient = MockHttpClient((request) async {
+            expect(request.url.toString(), equals(expectedUrl));
+            expect(request.url.path, isNot(contains('//')));
+            return http.Response(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'role': 'assistant', 'content': 'ok'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              }),
+              200,
+            );
+          });
+
+          final service = CloudAiService(
+            baseUrl: baseUrl,
+            apiKey: 'test-key',
+            modelName: 'gemini-1.5-flash',
+            httpClient: mockClient,
+          );
+
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
+          expect(response?.text, equals('ok'));
+        }
+      },
+    );
+
+    test(
       'sanitizes non-ASCII code points and whitespace from apiKey in Authorization header',
       () async {
         final mockClient = MockHttpClient((request) async {
