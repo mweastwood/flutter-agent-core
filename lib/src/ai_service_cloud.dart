@@ -135,7 +135,8 @@ class CloudAiService extends AiService {
       await _rateLimiter.throttleBeforeRequest(estimatedTokens);
     }
 
-    final url = Uri.parse('$baseUrl/chat/completions');
+    final normalizedBaseUrl = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    final url = Uri.parse('$normalizedBaseUrl/chat/completions');
 
     final List<Map<String, dynamic>> messages = [];
     if (imageBytes != null && imageBytes.isNotEmpty) {
