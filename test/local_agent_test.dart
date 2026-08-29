@@ -267,26 +267,10 @@ void main() {
       'continues execution when model response contains nullable, false, or empty error field',
       () async {
         final mockAi = TestMockAiService([
-          {
-            'action': 'increment',
-            'tool': 'inc',
-            'error': null,
-          },
-          {
-            'action': 'increment',
-            'tool': 'inc',
-            'error': false,
-          },
-          {
-            'action': 'increment',
-            'tool': 'inc',
-            'error': '   ',
-          },
-          {
-            'action': 'stop',
-            'tool': 'finish',
-            'error': null,
-          },
+          {'action': 'increment', 'tool': 'inc', 'error': null},
+          {'action': 'increment', 'tool': 'inc', 'error': false},
+          {'action': 'increment', 'tool': 'inc', 'error': '   '},
+          {'action': 'stop', 'tool': 'finish', 'error': null},
         ]);
         final delegate = MockTextAgentDelegate();
         final harness = AgentHarness<TestStepResult>(
@@ -305,7 +289,10 @@ void main() {
         expect(steps[2].feedback, equals('Counter is now 3'));
         expect(steps[3].isFinish, isTrue);
         expect(delegate.counter, equals(3));
-        expect(delegate.actionsApplied, equals(['increment', 'increment', 'increment']));
+        expect(
+          delegate.actionsApplied,
+          equals(['increment', 'increment', 'increment']),
+        );
         expect(mockAi.callCount, equals(4));
       },
     );
