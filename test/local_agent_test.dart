@@ -406,27 +406,24 @@ void main() {
       },
     );
 
-    test(
-      'fromJson safely handles image map with explicit null base64',
-      () {
-        final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
-        final jsonMap = {
-          'timestamp': timestamp.toIso8601String(),
-          'prompt': 'Analyze screenshot',
-          'response': 'Done',
-          'isError': false,
-          'image': {'mimeType': 'image/png', 'base64': null},
-        };
+    test('fromJson safely handles image map with explicit null base64', () {
+      final timestamp = DateTime(2026, 7, 12, 12, 0, 0);
+      final jsonMap = {
+        'timestamp': timestamp.toIso8601String(),
+        'prompt': 'Analyze screenshot',
+        'response': 'Done',
+        'isError': false,
+        'image': {'mimeType': 'image/png', 'base64': null},
+      };
 
-        final entry = AgentHistoryEntry.fromJson(jsonMap);
-        expect(entry.timestamp, equals(timestamp));
-        expect(entry.prompt, equals('Analyze screenshot'));
-        expect(entry.response, equals('Done'));
-        expect(entry.isError, isFalse);
-        expect(entry.imageBytes, isNull);
-        expect(entry.imageMimeType, equals('image/png'));
-      },
-    );
+      final entry = AgentHistoryEntry.fromJson(jsonMap);
+      expect(entry.timestamp, equals(timestamp));
+      expect(entry.prompt, equals('Analyze screenshot'));
+      expect(entry.response, equals('Done'));
+      expect(entry.isError, isFalse);
+      expect(entry.imageBytes, isNull);
+      expect(entry.imageMimeType, equals('image/png'));
+    });
 
     test(
       'fromJson safely defaults imageMimeType when image map omits or has non-string mimeType',
@@ -437,7 +434,9 @@ void main() {
           'prompt': 'Analyze screenshot',
           'response': 'Done',
           'isError': false,
-          'image': {'base64': base64Encode([4, 5, 6])},
+          'image': {
+            'base64': base64Encode([4, 5, 6]),
+          },
         };
 
         final entry1 = AgentHistoryEntry.fromJson(jsonMapWithoutMimeType);
@@ -449,7 +448,10 @@ void main() {
           'prompt': 'Analyze screenshot',
           'response': 'Done',
           'isError': false,
-          'image': {'mimeType': null, 'base64': base64Encode([7, 8, 9])},
+          'image': {
+            'mimeType': null,
+            'base64': base64Encode([7, 8, 9]),
+          },
         };
 
         final entry2 = AgentHistoryEntry.fromJson(jsonMapWithNullMimeType);
