@@ -165,16 +165,26 @@ String repairJson(String json) {
     result.write('"');
   }
 
+  var repaired = result.toString();
+  if (stack.isNotEmpty) {
+    var trimmed = repaired.trimRight();
+    while (trimmed.endsWith(',') || trimmed.endsWith(':')) {
+      trimmed = trimmed.substring(0, trimmed.length - 1).trimRight();
+    }
+    repaired = trimmed;
+  }
+
+  final closing = StringBuffer();
   while (stack.isNotEmpty) {
     final open = stack.removeLast();
     if (open == '{') {
-      result.write('}');
+      closing.write('}');
     } else if (open == '[') {
-      result.write(']');
+      closing.write(']');
     }
   }
 
-  return result.toString();
+  return '$repaired$closing';
 }
 
 Future<String?> runWithAutoContinuation({
