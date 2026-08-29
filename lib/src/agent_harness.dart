@@ -170,11 +170,11 @@ class AgentHistoryEntry {
       outputTokens: outTokens,
       totalTokens: totTokens,
       estimatedCostUsd: (json['estimatedCostUsd'] as num?)?.toDouble(),
-      imageBytes: imageMap != null
+      imageBytes: (imageMap != null && imageMap['base64'] is String)
           ? base64Decode(imageMap['base64'] as String)
           : null,
-      imageMimeType: imageMap != null
-          ? (imageMap['mimeType'] as String? ?? 'image/bmp')
+      imageMimeType: (imageMap != null && imageMap['mimeType'] is String)
+          ? (imageMap['mimeType'] as String)
           : 'image/bmp',
     );
   }
