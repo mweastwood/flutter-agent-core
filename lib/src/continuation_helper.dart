@@ -5,6 +5,19 @@ import 'package:flutter/foundation.dart';
 import 'ai_service.dart';
 import 'json_utils.dart';
 
+final _reTruncatedTerminator = RegExp(r'[.!?}]');
+final _reTruncatedContinue = RegExp(r'[a-zA-Z0-9,"-]');
+final _reLeadingNewlines = RegExp(r'^\r?\n+');
+final _reTrailingNewlines = RegExp(r'\r?\n+$');
+final _reConversationalHeader = RegExp(
+  r'^[a-zA-Z\s\n]+[:.]\s*(?=[{\["",\-\]])',
+);
+final _reCommonConversationalHeaders = [
+  RegExp(r'^\s*here is the continuation:\s*', caseSensitive: false),
+  RegExp(r'^\s*continuing:\s*', caseSensitive: false),
+  RegExp(r'^\s*continuation:\s*', caseSensitive: false),
+];
+
 @visibleForTesting
 bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
   if (nativeIsTruncated) return true;
@@ -29,9 +42,9 @@ bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
   // Alphanumeric/comma end heuristic: if it ends with a letter, digit, comma, or open quote
   // and does not have ending punctuation, it might be truncated.
   final lastChar = trimmed.substring(trimmed.length - 1);
-  final isEndingPunctuation = RegExp(r'[.!?}]').hasMatch(lastChar);
+  final isEndingPunctuation = _reTruncatedTerminator.hasMatch(lastChar);
   if (!isEndingPunctuation) {
-    if (RegExp(r'[a-zA-Z0-9,"\-]').hasMatch(lastChar)) {
+    if (_reTruncatedContinue.hasMatch(lastChar)) {
       return true;
     }
   }
@@ -50,29 +63,30 @@ String cleanContinuationChunk(String chunk) {
   }
 
   // Strip leading and trailing newlines (preserving spaces)
-  cleaned = cleaned.replaceFirst(RegExp(r'^\r?\n+'), '');
-  cleaned = cleaned.replaceFirst(RegExp(r'\r?\n+$'), '');
+  cleaned = cleaned.replaceFirst(_reLeadingNewlines, '');
+  cleaned = cleaned.replaceFirst(_reTrailingNewlines, '');
 
   // Remove conversational headers ending with colon or period followed by structural JSON chars or list item markers
-  cleaned = cleaned.replaceFirst(
-    RegExp(r'^[a-zA-Z\s\n]+[:.]\s*(?=[{\["",\-\]])'),
-    '',
-  );
-  cleaned = cleaned.replaceFirst(RegExp(r'^\r?\n+'), '');
+  cleaned = cleaned.replaceFirst(_reConversationalHeader, '');
+  cleaned = cleaned.replaceFirst(_reLeadingNewlines, '');
 
   // Remove common conversational headers
-  final headers = [
-    RegExp(r'^\s*here is the continuation:\s*', caseSensitive: false),
-    RegExp(r'^\s*continuing:\s*', caseSensitive: false),
-    RegExp(r'^\s*continuation:\s*', caseSensitive: false),
-  ];
-  for (final header in headers) {
+  for (final header in _reCommonConversationalHeaders) {
     if (cleaned.startsWith(header)) {
       cleaned = cleaned.replaceFirst(header, '');
     }
   }
 
   return cleaned;
+}
+
+bool _hasOverlap(String text, int textStart, String nextText, int length) {
+  for (var k = 0; k < length; k++) {
+    if (text.codeUnitAt(textStart + k) != nextText.codeUnitAt(k)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 @visibleForTesting
@@ -90,14 +104,7 @@ String stitchContinuation(String text, String nextText) {
     }
     for (var i = maxOverlap; i >= 3; i--) {
       final textStart = subTextLen - i;
-      var match = true;
-      for (var k = 0; k < i; k++) {
-        if (text.codeUnitAt(textStart + k) != nextText.codeUnitAt(k)) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
+      if (_hasOverlap(text, textStart, nextText, i)) {
         final prefixPart = offset == 0 ? text : text.substring(0, subTextLen);
         return prefixPart + nextText.substring(i);
       }

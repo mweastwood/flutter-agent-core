@@ -10,6 +10,8 @@ import 'ai_service.dart';
 import 'model_database.dart';
 import 'rate_limiter.dart';
 
+final _reNonAscii = RegExp(r'[^\x00-\x7F]');
+
 class CloudAiService extends AiService {
   final String baseUrl;
   final String apiKey;
@@ -152,7 +154,7 @@ class CloudAiService extends AiService {
       messages.add({'role': 'user', 'content': prompt});
     }
 
-    final cleanApiKey = apiKey.replaceAll(RegExp(r'[^\x00-\x7F]'), '').trim();
+    final cleanApiKey = apiKey.replaceAll(_reNonAscii, '').trim();
     final headers = {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $cleanApiKey',
