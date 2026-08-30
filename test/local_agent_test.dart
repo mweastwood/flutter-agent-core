@@ -1578,7 +1578,173 @@ void main() {
       },
     );
 
-    test('countTokens calculates local estimate', () async {
+    test('checkStatus returns AiCoreStatus.available', () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+      );
+      final status = await service.checkStatus();
+      expect(status, equals(AiCoreStatus.available));
+    });
+
+    test(
+      'triggerDownload handles null and non-null delay durations without error',
+      () async {
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+        );
+        await expectLater(service.triggerDownload(), completes);
+        await expectLater(
+          service.triggerDownload(delay: const Duration(milliseconds: 10)),
+          completes,
+        );
+      },
+    );
+
+    test(
+      'setModelConfig completes without error as a no-op compatibility method',
+      () async {
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+        );
+        await expectLater(
+          service.setModelConfig(releaseStage: 'preview', preference: 'fast'),
+          completes,
+        );
+      },
+    );
+
+    test(
+      'formats multimodal image payload with base64 data encoding when imageBytes is provided',
+      () async {
+        final imageBytes = Uint8List.fromList([
+          0x89,
+          0x50,
+          0x4E,
+          0x47,
+          0x0D,
+          0x0A,
+        ]);
+        final expectedBase64 = base64Encode(imageBytes);
+
+        final mockClient = MockHttpClient((request) async {
+          final bodyString = await request.finalize().bytesToString();
+          final bodyData = jsonDecode(bodyString);
+          expect(bodyData['messages'], hasLength(1));
+          final message = bodyData['messages'][0];
+          expect(message['role'], equals('user'));
+          expect(message['content'], isA<List>());
+          final contentList = message['content'] as List;
+          expect(contentList, hasLength(2));
+          expect(
+            contentList[0],
+            equals({'type': 'text', 'text': 'Describe this image'}),
+          );
+          expect(
+            contentList[1],
+            equals({
+              'type': 'image_url',
+              'image_url': {'url': 'data:image/png;base64,$expectedBase64'},
+            }),
+          );
+
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'It is a PNG header.',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final response = await service.generateContentRaw(
+          prompt: 'Describe this image',
+          imageBytes: imageBytes,
+        );
+        expect(response?.text, equals('It is a PNG header.'));
+        expect(response?.isError, isFalse);
+      },
+    );
+
+    test(
+      'generateContent wrapper delegates to generateContentRaw and returns text string',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'Response from wrapper test',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final text = await service.generateContent(
+          prompt: 'Wrapper prompt test',
+        );
+        expect(text, equals('Response from wrapper test'));
+      },
+    );
+
+    test(
+      'catches FormatException on malformed JSON body in HTTP 200 response and returns isError: true',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response('{ invalid json body', 200);
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final response = await service.generateContentRaw(
+          prompt: 'trigger parse error',
+        );
+        expect(response, isNotNull);
+        expect(response!.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        expect(response.text, contains('"error":'));
+        expect(response.text, contains('FormatException'));
+      },
+    );
+
+    test('countTokens calculates local estimate and image overhead', () async {
       final service = CloudAiService(
         baseUrl: 'https://api.gemini.com/v1',
         apiKey: 'test-key',
@@ -1586,6 +1752,20 @@ void main() {
       );
       final count = await service.countTokens(prompt: 'hello world');
       expect(count, equals(3));
+
+      final imageBytes = Uint8List.fromList([1, 2, 3, 4]);
+      final countWithImage = await service.countTokens(
+        prompt: 'hello world',
+        imageBytes: imageBytes,
+      );
+      expect(countWithImage, equals(3 + 256));
+
+      final emptyImageBytes = Uint8List(0);
+      final countWithEmptyImage = await service.countTokens(
+        prompt: 'hello world',
+        imageBytes: emptyImageBytes,
+      );
+      expect(countWithEmptyImage, equals(3));
     });
   });
 
