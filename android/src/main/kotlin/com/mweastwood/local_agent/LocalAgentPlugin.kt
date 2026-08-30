@@ -110,7 +110,6 @@ class LocalAgentPlugin : FlutterPlugin, MethodCallHandler {
                 result.success(null)
             }
             "countTokens" -> {
-                val model = getModel(call)
                 val promptText = call.argument<String>("prompt")
                 val imageBytes = call.argument<ByteArray>("image")
 
@@ -119,6 +118,7 @@ class LocalAgentPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
+                val model = getModel(call)
                 ioScope.launch {
                     var bitmap: Bitmap? = null
                     try {
@@ -152,7 +152,6 @@ class LocalAgentPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
             "generateContent" -> {
-                val model = getModel(call)
                 val promptText = call.argument<String>("prompt")
                 val imageBytes = call.argument<ByteArray>("image")
                 val temperature = call.argument<Double>("temperature")?.toFloat() ?: 0.7f
@@ -166,6 +165,7 @@ class LocalAgentPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
+                val model = getModel(call)
                 ioScope.launch {
                     var bitmap: Bitmap? = null
                     try {
