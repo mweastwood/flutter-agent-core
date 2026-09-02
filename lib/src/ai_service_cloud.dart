@@ -50,6 +50,7 @@ class CloudAiService extends AiService {
        })();
 
   /// Closes the internal [http.Client] if it was created and owned by this instance.
+  @override
   void dispose() {
     if (_ownsHttpClient) {
       _httpClient.close();

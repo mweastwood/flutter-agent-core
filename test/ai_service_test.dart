@@ -200,6 +200,16 @@ void main() {
         expect(service.generateContentCallCount, equals(1));
       },
     );
+
+    test('dispose defaults to a safe no-op on base class', () {
+      final service = TestFakeAiService();
+      expect(() => service.dispose(), returnsNormally);
+    });
+
+    test('dispose can be invoked polymorphically on AiService reference', () {
+      final AiService service = TestFakeAiService();
+      expect(() => service.dispose(), returnsNormally);
+    });
   });
 
   group('AiServiceJsonExtension.generateJson Tests', () {
@@ -371,6 +381,19 @@ void main() {
 
         await service.triggerDownload();
         expect(await service.checkStatus(), equals(AiCoreStatus.available));
+      },
+    );
+
+    test('dispose executes safely without errors on MockAiService', () {
+      final service = MockAiService();
+      expect(() => service.dispose(), returnsNormally);
+    });
+
+    test(
+      'dispose executes safely when called polymorphically on AiService reference to MockAiService',
+      () {
+        final AiService service = MockAiService();
+        expect(() => service.dispose(), returnsNormally);
       },
     );
   });
