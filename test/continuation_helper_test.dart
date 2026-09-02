@@ -185,5 +185,50 @@ void main() {
       );
       expect(stitchContinuation('abc', 'def'), equals('abcdef'));
     });
+
+    test('stitchContinuation handles short strings and empty inputs', () {
+      expect(stitchContinuation('', ''), equals(''));
+      expect(stitchContinuation('a', 'b'), equals('ab'));
+      expect(stitchContinuation('ab', 'cd'), equals('abcd'));
+      expect(stitchContinuation('', 'hello'), equals('hello'));
+      expect(stitchContinuation('hello', ''), equals('hello'));
+      expect(stitchContinuation('ab', 'abc'), equals('ababc'));
+    });
+
+    test('stitchContinuation requires minimum overlap of 3 characters', () {
+      expect(
+        stitchContinuation('hello ab', 'ab world'),
+        equals('hello abab world'),
+      );
+      expect(
+        stitchContinuation('hello abc', 'abc world'),
+        equals('hello abc world'),
+      );
+    });
+
+    test('stitchContinuation handles long strings and large overlaps', () {
+      final longPrefix = 'A' * 600;
+      final overlap = 'B' * 500;
+      final longSuffix = 'C' * 600;
+      final text = longPrefix + overlap;
+      final nextText = overlap + longSuffix;
+
+      final stitched = stitchContinuation(text, nextText);
+      expect(stitched, equals(longPrefix + overlap + longSuffix));
+    });
+
+    test(
+      'stitchContinuation handles repetitive patterns and KMP fallbacks',
+      () {
+        expect(
+          stitchContinuation('abcabcabc', 'abcabcf'),
+          equals('abcabcabcf'),
+        );
+        expect(
+          stitchContinuation('aaaaaaa', 'aaaa-end'),
+          equals('aaaaaaa-end'),
+        );
+      },
+    );
   });
 }
