@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -6,7 +7,47 @@ import 'package:flutter/services.dart';
 import 'ai_service.dart';
 
 class MethodChannelAiService extends AiService {
-  static const _channel = MethodChannel('com.mweastwood.local_agent');
+  static const _defaultChannel = MethodChannel('com.mweastwood.local_agent');
+
+  final MethodChannel _channel;
+  final int maxRetries;
+  final Duration initialRetryDelay;
+  final Duration maxRetryDelay;
+  final bool enableJitter;
+  final Random? _random;
+
+  MethodChannelAiService({
+    MethodChannel channel = _defaultChannel,
+    this.maxRetries = 3,
+    this.initialRetryDelay = const Duration(milliseconds: 500),
+    this.maxRetryDelay = const Duration(seconds: 15),
+    this.enableJitter = true,
+    Random? random,
+  }) : _channel = channel,
+       _random = random;
+
+  @visibleForTesting
+  Duration calculateBackoff(int attempt) {
+    final expFactor = 1 << (attempt - 1).clamp(0, 30);
+    final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
+    final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
+
+    if (boundedMs == 0) {
+      return Duration.zero;
+    }
+
+    if (!enableJitter) {
+      return Duration(milliseconds: boundedMs);
+    }
+
+    final random = _random ?? Random();
+    final jitterRange = min(1000, (boundedMs * 0.25).round());
+    final jitter = jitterRange > 0
+        ? (random.nextInt(jitterRange * 2) - jitterRange)
+        : 0;
+    final finalMs = max(1, boundedMs + jitter);
+    return Duration(milliseconds: finalMs);
+  }
 
   @override
   Future<AiCoreStatus> checkStatus() async {
@@ -70,8 +111,9 @@ class MethodChannelAiService extends AiService {
       dynamic lastError;
       StackTrace? lastStackTrace;
       final List<String> attemptErrors = [];
+      final totalAttempts = maxRetries > 0 ? maxRetries + 1 : 1;
 
-      for (int attempt = 1; attempt <= 4; attempt++) {
+      for (int attempt = 1; attempt <= totalAttempts; attempt++) {
         try {
           result = await _channel.invokeMethod<dynamic>('generateContent', {
             'prompt': prompt,
@@ -85,11 +127,11 @@ class MethodChannelAiService extends AiService {
           lastStackTrace = stack;
           attemptErrors.add('Attempt $attempt: $e');
           debugPrint(
-            'Error generating content (attempt $attempt/4) via MethodChannel (generateContent): $e',
+            'Error generating content (attempt $attempt/$totalAttempts) via MethodChannel (generateContent): $e',
           );
-          if (attempt < 4) {
-            final backoffMs = attempt * 500; // 500ms, 1000ms, 1500ms
-            await Future.delayed(Duration(milliseconds: backoffMs));
+          if (attempt < totalAttempts) {
+            final backoff = calculateBackoff(attempt);
+            await Future.delayed(backoff);
           }
         }
       }
