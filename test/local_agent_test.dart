@@ -1865,6 +1865,10 @@ void main() {
         isTruncatedHeuristic('```json\n{"foo": "bar"}```', false),
         isFalse,
       );
+      expect(
+        isTruncatedHeuristic(r'{"code": "print(```x```)"}', false),
+        isFalse,
+      );
     });
 
     test('isTruncatedHeuristic text truncation endings', () {

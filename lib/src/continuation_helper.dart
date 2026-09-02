@@ -34,8 +34,8 @@ bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
     }
   }
 
-  // Code fence heuristic: has opening code fence but not closing, or ends inside one
-  if (trimmed.contains('```') && !trimmed.endsWith('```')) {
+  // Code fence heuristic: starts with opening code fence but not closed at the end
+  if (trimmed.startsWith('```') && !trimmed.endsWith('```')) {
     return true;
   }
 
