@@ -169,10 +169,7 @@ void main() {
         isTruncatedHeuristic(r'{"code": "print(```x```)"}', false),
         isFalse,
       );
-      expect(
-        isTruncatedHeuristic('```dart\nvoid main() {', false),
-        isTrue,
-      );
+      expect(isTruncatedHeuristic('```dart\nvoid main() {', false), isTrue);
       expect(
         isTruncatedHeuristic('```dart\nvoid main() {}\n```', false),
         isFalse,
