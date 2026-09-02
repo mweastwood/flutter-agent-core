@@ -88,7 +88,7 @@ class WebAiService extends AiService {
 
       return AiResponse(
         text: response,
-        isTruncated: false,
+        isTruncated: isTruncatedHeuristic(response, false),
         isError: false,
       );
     } catch (e) {
