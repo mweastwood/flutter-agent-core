@@ -42,8 +42,7 @@ class TestMockAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async =>
-      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 }
 
 class _RawStringMockAiService extends AiService {
@@ -2083,8 +2082,7 @@ class _HeuristicMockAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async =>
-      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 }
 
 class MockHttpClient extends http.BaseClient {

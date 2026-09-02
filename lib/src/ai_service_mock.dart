@@ -114,6 +114,5 @@ class MockAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async =>
-      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 }

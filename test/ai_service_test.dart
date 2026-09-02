@@ -207,15 +207,18 @@ void main() {
       expect(AiService.estimateTokenCount(''), equals(0));
     });
 
-    test('calculates prompt token counts with rounding (~4 chars per token)', () {
-      expect(AiService.estimateTokenCount('a'), equals(0));
-      expect(AiService.estimateTokenCount('ab'), equals(1));
-      expect(AiService.estimateTokenCount('abc'), equals(1));
-      expect(AiService.estimateTokenCount('abcd'), equals(1));
-      expect(AiService.estimateTokenCount('12345'), equals(1));
-      expect(AiService.estimateTokenCount('123456'), equals(2));
-      expect(AiService.estimateTokenCount('12345678'), equals(2));
-    });
+    test(
+      'calculates prompt token counts with rounding (~4 chars per token)',
+      () {
+        expect(AiService.estimateTokenCount('a'), equals(0));
+        expect(AiService.estimateTokenCount('ab'), equals(1));
+        expect(AiService.estimateTokenCount('abc'), equals(1));
+        expect(AiService.estimateTokenCount('abcd'), equals(1));
+        expect(AiService.estimateTokenCount('12345'), equals(1));
+        expect(AiService.estimateTokenCount('123456'), equals(2));
+        expect(AiService.estimateTokenCount('12345678'), equals(2));
+      },
+    );
 
     test(
       'handles imageBytes variations (null, empty Uint8List, non-empty Uint8List)',

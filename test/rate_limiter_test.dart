@@ -196,7 +196,10 @@ void main() {
           expect(async.elapsed, equals(Duration.zero));
           expect(limiter.requestTimestamps.length, equals(1));
           expect(limiter.requestTimestamps.first, equals(clock.now()));
-          expect(limiter.requestTimestamps.contains(boundaryTimestamp), isFalse);
+          expect(
+            limiter.requestTimestamps.contains(boundaryTimestamp),
+            isFalse,
+          );
 
           expect(limiter.tokenUsage.length, equals(1));
           expect(limiter.tokenUsage.first.timestamp, equals(clock.now()));
