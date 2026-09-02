@@ -1,8 +1,17 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
+import 'package:flutter_agent_core/src/models/gemini_models.dart';
+import 'package:flutter_agent_core/src/models/zhipu_models.dart';
 
 void main() {
   group('CloudModelDatabase Tests', () {
+    test('static model lists match provider constants', () {
+      expect(CloudModelDatabase.geminiModels, equals(kGeminiModels));
+      expect(CloudModelDatabase.zhipuModels, equals(kZhipuModels));
+      expect(kGeminiModels, isNotEmpty);
+      expect(kZhipuModels, isNotEmpty);
+    });
+
     test('CloudModelDatabase query APIs return expected models', () {
       final allModels = CloudModelDatabase.getAvailableModels();
       expect(allModels, isNotEmpty);

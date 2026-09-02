@@ -6,4 +6,5 @@ export 'src/continuation_helper.dart';
 export 'src/agent_harness.dart';
 export 'src/json_utils.dart';
 export 'src/model_database.dart';
+export 'src/model_info.dart';
 export 'src/rate_limiter.dart';
