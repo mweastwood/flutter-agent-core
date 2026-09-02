@@ -82,16 +82,6 @@ class WebAiService extends AiService {
       final ai = chromeAi;
       if (ai == null) return null;
 
-      if (temperature <= 0.5) {
-        // Fallback for suggesting exactly 16 hex color strings on web
-        await Future.delayed(const Duration(milliseconds: 500));
-        final List<String> mockPalette = List.generate(16, (i) {
-          final val = (i * 0x11).toRadixString(16).padLeft(2, '0');
-          return '#$val$val$val';
-        });
-        return '["${mockPalette.join('", "')}"]';
-      }
-
       final jsResponse = await ai.getNextStroke(prompt.toJS, ''.toJS).toDart;
       final String? response = (jsResponse as JSString?)?.toDart;
       return response;
