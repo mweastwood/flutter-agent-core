@@ -151,6 +151,25 @@ class MockTextAgentDelegate implements AgentDelegate<TestStepResult> {
   }
 }
 
+class ThrowingAgentDelegate extends MockTextAgentDelegate {
+  final String failOnAction;
+  final Exception exception;
+
+  ThrowingAgentDelegate({
+    this.failOnAction = 'fail',
+    Exception? exception,
+  }) : exception = exception ?? Exception('Action execution failed');
+
+  @override
+  Future<String> applyAction(Map<String, dynamic> actionMap) async {
+    final action = actionMap['action'] as String? ?? '';
+    if (action == failOnAction) {
+      throw exception;
+    }
+    return super.applyAction(actionMap);
+  }
+}
+
 void main() {
   group('AgentHarness Generic ReAct Loop Tests', () {
     test('harness executes generic steps and updates environment', () async {
@@ -388,6 +407,47 @@ void main() {
         equals(['increment', 'increment', 'increment']),
       );
     });
+
+    test(
+      'catches exception from delegate.applyAction, records error step, notifies onStep, and returns partial results',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'fail', 'tool': 'fail_action'},
+          {'action': 'increment', 'tool': 'inc'},
+        ]);
+        final delegate = ThrowingAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final recordedSteps = <int>[];
+        final recordedResults = <TestStepResult>[];
+
+        final steps = await harness.runLoop(
+          userPrompt: 'test failure handling',
+          maxSteps: 5,
+          onStep: (stepResult, currentStep) {
+            recordedSteps.add(currentStep);
+            recordedResults.add(stepResult);
+          },
+        );
+
+        expect(steps.length, equals(2));
+        expect(steps[0].tool, equals('inc'));
+        expect(steps[0].feedback, equals('Counter is now 1'));
+        expect(steps[1].tool, equals('fail_action'));
+        expect(
+          steps[1].feedback,
+          equals('Error applying action: Exception: Action execution failed'),
+        );
+        expect(recordedSteps, equals([1, 2]));
+        expect(recordedResults, equals(steps));
+        expect(delegate.counter, equals(1));
+        expect(mockAi.callCount, equals(2));
+      },
+    );
   });
 
   group('AgentHistoryEntry Serialization Tests', () {

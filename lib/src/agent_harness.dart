@@ -94,7 +94,20 @@ class AgentHarness<T> {
       }
 
       // Apply command to environment
-      final stepFeedback = await delegate.applyAction(parsed);
+      String stepFeedback;
+      try {
+        stepFeedback = await delegate.applyAction(parsed);
+      } catch (e) {
+        final errorResult = delegate.parseStepResult(
+          parsed,
+          'Error applying action: $e',
+        );
+        results.add(errorResult);
+        if (onStep != null) {
+          onStep(errorResult, step);
+        }
+        break;
+      }
 
       final stepResult = delegate.parseStepResult(parsed, stepFeedback);
 
