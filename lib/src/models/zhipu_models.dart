@@ -1,0 +1,58 @@
+import '../model_info.dart';
+
+const List<CloudModelInfo> kZhipuModels = [
+  CloudModelInfo(
+    modelName: 'glm-5.2',
+    provider: CloudProvider.zhipu,
+    isVision: false,
+    limitRps: 2,
+    inputPricePerMillion: 1.40,
+    outputPricePerMillion: 1.40,
+    description: 'Commercial: 2 RPS (Approx. \$1.40 / 1M input tokens)',
+  ),
+  CloudModelInfo(
+    modelName: 'glm-5v-turbo',
+    provider: CloudProvider.zhipu,
+    isVision: true,
+    limitRps: 2,
+    inputPricePerMillion: 0.80,
+    outputPricePerMillion: 0.80,
+    description: 'Commercial: 2 RPS (Flagship Vision Model)',
+  ),
+  CloudModelInfo(
+    modelName: 'glm-4v-flash',
+    provider: CloudProvider.zhipu,
+    isVision: true,
+    limitRps: 2,
+    inputPricePerMillion: 0.0,
+    outputPricePerMillion: 0.0,
+    description: 'Free Tier Limits: 2 RPS (Zero cost vision model)',
+  ),
+  CloudModelInfo(
+    modelName: 'glm-4.7-flash',
+    provider: CloudProvider.zhipu,
+    isVision: false,
+    limitRps: 2,
+    inputPricePerMillion: 0.0,
+    outputPricePerMillion: 0.0,
+    description: 'Free Tier Limits: 2 RPS (zero cost, completely free)',
+  ),
+  CloudModelInfo(
+    modelName: 'glm-4.7',
+    provider: CloudProvider.zhipu,
+    isVision: false,
+    limitRps: 2,
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.14,
+    description: 'Commercial: 2 RPS (Standard capability)',
+  ),
+  CloudModelInfo(
+    modelName: 'glm-4.5-air',
+    provider: CloudProvider.zhipu,
+    isVision: false,
+    limitRps: 2,
+    inputPricePerMillion: 0.14,
+    outputPricePerMillion: 0.14,
+    description: 'Commercial: 2 RPS (Light, balanced)',
+  ),
+];
