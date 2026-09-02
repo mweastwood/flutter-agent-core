@@ -162,6 +162,55 @@ void main() {
       },
     );
 
+    test(
+      'RateLimiter prunes request timestamps and token usage exactly on the 1-minute boundary',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-boundary-prune-model',
+            provider: CloudProvider.gemini,
+            limitRpm: 1,
+            limitTpm: 100,
+            description: 'Test boundary limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Record an entry exactly 60 seconds (1 minute) ago
+          final boundaryTimestamp = clock.now().subtract(
+            const Duration(minutes: 1),
+          );
+          limiter.recordRequestForTesting(boundaryTimestamp, tokenCount: 100);
+
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.tokenUsage.length, equals(1));
+
+          // Next request at clock.now() should prune the boundary entry without waiting
+          limiter.throttleBeforeRequest(50);
+
+          expect(async.elapsed, equals(Duration.zero));
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.requestTimestamps.first, equals(clock.now()));
+          expect(limiter.requestTimestamps.contains(boundaryTimestamp), isFalse);
+
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.tokenUsage.first.timestamp, equals(clock.now()));
+          expect(limiter.tokenUsage.first.tokenCount, equals(50));
+          expect(
+            limiter.tokenUsage.any(
+              (item) => item.timestamp == boundaryTimestamp,
+            ),
+            isFalse,
+          );
+        });
+      },
+    );
+
     test('RateLimiter handles Tokens-Per-Minute (TPM) throttling', () {
       fakeAsync((async) {
         final clock = async.getClock(DateTime(2026, 1, 1));

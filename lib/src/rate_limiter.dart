@@ -41,14 +41,14 @@ class RateLimiter {
 
   void _pruneExpiredRequests(DateTime now, Duration window) {
     while (_requestTimestamps.isNotEmpty &&
-        now.difference(_requestTimestamps.first) > window) {
+        now.difference(_requestTimestamps.first) >= window) {
       _requestTimestamps.removeFirst();
     }
   }
 
   void _pruneExpiredTokens(DateTime now, Duration window) {
     while (_tokenUsage.isNotEmpty &&
-        now.difference(_tokenUsage.first.timestamp) > window) {
+        now.difference(_tokenUsage.first.timestamp) >= window) {
       final removed = _tokenUsage.removeFirst();
       _runningTokenSum = (_runningTokenSum - removed.tokenCount).clamp(
         0,
