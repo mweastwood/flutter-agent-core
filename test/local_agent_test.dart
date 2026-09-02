@@ -1840,6 +1840,38 @@ void main() {
         expect(res.estimatedCostUsd, closeTo(0.0003, 0.0000001));
       },
     );
+
+    test(
+      'dispose closes internal httpClient when client is not provided externally',
+      () {
+        final service = CloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+        );
+
+        expect(() => service.dispose(), returnsNormally);
+        expect(() => service.dispose(), returnsNormally);
+      },
+    );
+
+    test(
+      'dispose does not close injected httpClient when client is provided externally',
+      () {
+        final mockClient = MockHttpClient(
+          (request) async => http.Response('{}', 200),
+        );
+        final service = CloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        service.dispose();
+        expect(mockClient.isClosed, isFalse);
+      },
+    );
   });
 
   group('Heuristic & Chunk Cleaning Tests', () {
@@ -2099,7 +2131,10 @@ class _HeuristicMockAiService extends AiService {
 
 class MockHttpClient extends http.BaseClient {
   final Future<http.Response> Function(http.BaseRequest request) sendHandler;
-  MockHttpClient(this.sendHandler);
+  final void Function()? onClose;
+  bool isClosed = false;
+
+  MockHttpClient(this.sendHandler, {this.onClose});
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
@@ -2112,5 +2147,12 @@ class MockHttpClient extends http.BaseClient {
       contentLength: bodyBytes.length,
       request: request,
     );
+  }
+
+  @override
+  void close() {
+    isClosed = true;
+    onClose?.call();
+    super.close();
   }
 }

@@ -22,6 +22,7 @@ class CloudAiService extends AiService {
   final Duration maxRetryDelay;
   final bool enableJitter;
   final http.Client _httpClient;
+  final bool _ownsHttpClient;
   final RateLimiter? _rateLimiter;
   final Random? _random;
 
@@ -37,6 +38,7 @@ class CloudAiService extends AiService {
     http.Client? httpClient,
     this._random,
   }) : _httpClient = httpClient ?? http.Client(),
+       _ownsHttpClient = httpClient == null,
        _rateLimiter = (() {
          final info = CloudModelDatabase.getModelInfo(modelName);
          return info != null
@@ -46,6 +48,13 @@ class CloudAiService extends AiService {
                )
              : null;
        })();
+
+  /// Closes the internal [http.Client] if it was created and owned by this instance.
+  void dispose() {
+    if (_ownsHttpClient) {
+      _httpClient.close();
+    }
+  }
 
   @override
   Future<AiCoreStatus> checkStatus() async {
