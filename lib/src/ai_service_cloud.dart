@@ -69,14 +69,8 @@ class CloudAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async {
-    // Estimator: 1 token is roughly 4 characters
-    int count = (prompt.length / 4).round();
-    if (imageBytes != null && imageBytes.isNotEmpty) {
-      count += 256;
-    }
-    return count;
-  }
+  }) async =>
+      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 
   @visibleForTesting
   Duration calculateBackoff(int attempt, http.Response? response) =>
