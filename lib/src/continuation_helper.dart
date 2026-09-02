@@ -150,7 +150,15 @@ String repairJson(String json) {
   if (json.isEmpty) return '';
 
   final stack = <_StackFrame>[];
-  final output = <String>[];
+  final output = StringBuffer();
+
+  void truncateTo(int targetLen) {
+    if (output.length > targetLen) {
+      final current = output.toString().substring(0, targetLen);
+      output.clear();
+      output.write(current);
+    }
+  }
 
   void onValueCompleted(int endPos) {
     if (stack.isNotEmpty) {
@@ -170,19 +178,19 @@ String repairJson(String json) {
     final char = json[i];
 
     if (char == ' ' || char == '\t' || char == '\r' || char == '\n') {
-      output.add(char);
+      output.write(char);
       i++;
       continue;
     }
 
     if (char == '"') {
-      output.add('"');
+      output.write('"');
       i++;
       var escape = false;
       var stringClosed = false;
       while (i < json.length) {
         final strChar = json[i];
-        output.add(strChar);
+        output.write(strChar);
         i++;
         if (escape) {
           escape = false;
@@ -196,9 +204,9 @@ String repairJson(String json) {
 
       if (!stringClosed) {
         if (escape) {
-          output.add(r'\');
+          output.write(r'\');
         }
-        output.add('"');
+        output.write('"');
       }
 
       if (stack.isNotEmpty) {
@@ -221,21 +229,21 @@ String repairJson(String json) {
     }
 
     if (char == '{') {
-      output.add('{');
+      output.write('{');
       i++;
       stack.add(_StackFrame.object(output.length));
       continue;
     }
 
     if (char == '[') {
-      output.add('[');
+      output.write('[');
       i++;
       stack.add(_StackFrame.array(output.length));
       continue;
     }
 
     if (char == ':') {
-      output.add(':');
+      output.write(':');
       i++;
       if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
         if (stack.last.objectState == _ObjectState.expectingColon) {
@@ -246,7 +254,7 @@ String repairJson(String json) {
     }
 
     if (char == ',') {
-      output.add(',');
+      output.write(',');
       i++;
       if (stack.isNotEmpty) {
         final top = stack.last;
@@ -265,18 +273,18 @@ String repairJson(String json) {
         final frame = stack.removeLast();
         if (frame.arrayState == _ArrayState.expectingValue &&
             frame.lastCommaPos != -1) {
-          output.length = frame.lastCompleteEntryEndPos;
+          truncateTo(frame.lastCompleteEntryEndPos);
         }
-        output.add(']');
+        output.write(']');
       }
 
       if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
         stack.removeLast();
-        output.add('}');
+        output.write('}');
         i++;
         onValueCompleted(output.length);
       } else {
-        output.add('}');
+        output.write('}');
         i++;
       }
       continue;
@@ -286,9 +294,9 @@ String repairJson(String json) {
       while (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
         final frame = stack.removeLast();
         if (frame.objectState != _ObjectState.expectingCommaOrClose) {
-          output.length = frame.lastCompleteEntryEndPos;
+          truncateTo(frame.lastCompleteEntryEndPos);
         }
-        output.add('}');
+        output.write('}');
         if (stack.isNotEmpty) {
           onValueCompleted(output.length);
         }
@@ -298,13 +306,13 @@ String repairJson(String json) {
         final frame = stack.removeLast();
         if (frame.arrayState == _ArrayState.expectingValue &&
             frame.lastCommaPos != -1) {
-          output.length = frame.lastCompleteEntryEndPos;
+          truncateTo(frame.lastCompleteEntryEndPos);
         }
-        output.add(']');
+        output.write(']');
         i++;
         onValueCompleted(output.length);
       } else {
-        output.add(']');
+        output.write(']');
         i++;
       }
       continue;
@@ -312,7 +320,7 @@ String repairJson(String json) {
 
     // Literals (numbers, boolean, null)
     while (i < json.length && !'{}[]:, \t\r\n"'.contains(json[i])) {
-      output.add(json[i]);
+      output.write(json[i]);
       i++;
     }
     onValueCompleted(output.length);
@@ -322,25 +330,25 @@ String repairJson(String json) {
     final frame = stack.removeLast();
     if (frame.type == _ContainerType.object) {
       if (frame.objectState != _ObjectState.expectingCommaOrClose) {
-        output.length = frame.lastCompleteEntryEndPos;
+        truncateTo(frame.lastCompleteEntryEndPos);
       }
-      output.add('}');
+      output.write('}');
       if (stack.isNotEmpty) {
         onValueCompleted(output.length);
       }
     } else {
       if (frame.arrayState == _ArrayState.expectingValue &&
           frame.lastCommaPos != -1) {
-        output.length = frame.lastCompleteEntryEndPos;
+        truncateTo(frame.lastCompleteEntryEndPos);
       }
-      output.add(']');
+      output.write(']');
       if (stack.isNotEmpty) {
         onValueCompleted(output.length);
       }
     }
   }
 
-  return output.join();
+  return output.toString();
 }
 
 Future<String?> runWithAutoContinuation({

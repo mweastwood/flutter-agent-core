@@ -155,6 +155,33 @@ void main() {
       expect(repairedEscape, equals(r'{"path": "C:\\folder\\"}'));
       expect(jsonDecode(repairedEscape), equals({'path': r'C:\folder\'}));
     });
+
+    test('repairs large JSON payloads efficiently and correctly', () {
+      final largeArrayItems = List.generate(1000, (i) => '{"index": $i, "name": "item_$i"}').join(', ');
+      final truncatedLargeJson = '{"total": 1000, "items": [$largeArrayItems, {"index": 1000, "name": ';
+      final repairedLargeJson = repairJson(truncatedLargeJson);
+      final decoded = jsonDecode(repairedLargeJson) as Map<String, dynamic>;
+      expect(decoded['total'], equals(1000));
+      expect((decoded['items'] as List).length, equals(1001));
+      expect((decoded['items'] as List).last, equals({'index': 1000}));
+    });
+
+    test('handles rollback across multiple nested structures', () {
+      const nestedTruncated = '{"outer": {"list": [{"a": 1, "b": 2}, {"a": 3, "unfin';
+      final repaired = repairJson(nestedTruncated);
+      expect(repaired, equals('{"outer": {"list": [{"a": 1, "b": 2}, {"a": 3}]}}'));
+      expect(
+        jsonDecode(repaired),
+        equals({
+          'outer': {
+            'list': [
+              {'a': 1, 'b': 2},
+              {'a': 3},
+            ],
+          },
+        }),
+      );
+    });
   });
 
   group('Heuristic and Chunk Cleaning Tests', () {
