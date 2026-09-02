@@ -155,10 +155,8 @@ class ThrowingAgentDelegate extends MockTextAgentDelegate {
   final String failOnAction;
   final Exception exception;
 
-  ThrowingAgentDelegate({
-    this.failOnAction = 'fail',
-    Exception? exception,
-  }) : exception = exception ?? Exception('Action execution failed');
+  ThrowingAgentDelegate({this.failOnAction = 'fail', Exception? exception})
+    : exception = exception ?? Exception('Action execution failed');
 
   @override
   Future<String> applyAction(Map<String, dynamic> actionMap) async {
