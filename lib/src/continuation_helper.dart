@@ -80,13 +80,19 @@ String cleanContinuationChunk(String chunk) {
   return cleaned;
 }
 
-bool _hasOverlap(String text, int textStart, String nextText, int length) {
-  for (var k = 0; k < length; k++) {
-    if (text.codeUnitAt(textStart + k) != nextText.codeUnitAt(k)) {
-      return false;
+List<int> _buildKmpFailureTable(String pattern) {
+  final failure = List<int>.filled(pattern.length, 0);
+  var j = 0;
+  for (var i = 1; i < pattern.length; i++) {
+    while (j > 0 && pattern.codeUnitAt(i) != pattern.codeUnitAt(j)) {
+      j = failure[j - 1];
     }
+    if (pattern.codeUnitAt(i) == pattern.codeUnitAt(j)) {
+      j++;
+    }
+    failure[i] = j;
   }
-  return true;
+  return failure;
 }
 
 @visibleForTesting
@@ -94,20 +100,38 @@ String stitchContinuation(String text, String nextText) {
   final textLen = text.length;
   final nextLen = nextText.length;
 
-  for (var offset = 0; offset < 50; offset++) {
-    if (textLen <= offset) break;
-    final subTextLen = textLen - offset;
+  if (textLen < 3 || nextLen < 3) {
+    return text + nextText;
+  }
 
-    var maxOverlap = subTextLen < nextLen ? subTextLen : nextLen;
-    if (maxOverlap > 500) {
-      maxOverlap = 500;
+  final pattern = nextLen > 500 ? nextText.substring(0, 500) : nextText;
+  final failure = _buildKmpFailureTable(pattern);
+
+  final start = textLen > 550 ? textLen - 550 : 0;
+  final count = textLen - start;
+  final states = List<int>.filled(count, 0);
+
+  var j = 0;
+  for (var i = start; i < textLen; i++) {
+    final code = text.codeUnitAt(i);
+    while (j > 0 && (j == pattern.length || code != pattern.codeUnitAt(j))) {
+      j = failure[j - 1];
     }
-    for (var i = maxOverlap; i >= 3; i--) {
-      final textStart = subTextLen - i;
-      if (_hasOverlap(text, textStart, nextText, i)) {
-        final prefixPart = offset == 0 ? text : text.substring(0, subTextLen);
-        return prefixPart + nextText.substring(i);
-      }
+    if (code == pattern.codeUnitAt(j)) {
+      j++;
+    }
+    states[i - start] = j;
+  }
+
+  final maxOffset = textLen < 50 ? textLen : 50;
+  for (var offset = 0; offset < maxOffset; offset++) {
+    final subTextLen = textLen - offset;
+    if (subTextLen < 3) break;
+
+    final overlap = states[subTextLen - 1 - start];
+    if (overlap >= 3) {
+      final prefixPart = offset == 0 ? text : text.substring(0, subTextLen);
+      return prefixPart + nextText.substring(overlap);
     }
   }
 
