@@ -81,6 +81,13 @@ abstract class AiService {
     if (text == null) return null;
     return AiResponse(text: text, isTruncated: false);
   }
+
+  /// Releases any underlying resources, connections, or client sessions held by this service.
+  ///
+  /// Subclasses should override this method to perform cleanup (such as closing HTTP clients)
+  /// when the service is no longer needed (e.g., within a Riverpod `ref.onDispose` callback).
+  /// The default implementation is a no-op.
+  void dispose() {}
 }
 
 AiService getAiService() {

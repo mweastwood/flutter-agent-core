@@ -290,5 +290,17 @@ void main() {
         );
       });
     });
+
+    group('dispose', () {
+      test('executes safely without errors', () {
+        final service = MockAiService();
+        expect(() => service.dispose(), returnsNormally);
+      });
+
+      test('executes safely via polymorphic AiService reference', () {
+        final AiService service = MockAiService();
+        expect(() => service.dispose(), returnsNormally);
+      });
+    });
   });
 }
