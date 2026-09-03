@@ -202,6 +202,53 @@ void main() {
     );
   });
 
+  group('AiService.estimateTokenCount Tests', () {
+    test('estimates 0 tokens for empty prompt without image', () {
+      expect(AiService.estimateTokenCount(''), equals(0));
+    });
+
+    test(
+      'calculates prompt token counts with rounding (~4 chars per token)',
+      () {
+        expect(AiService.estimateTokenCount('a'), equals(0));
+        expect(AiService.estimateTokenCount('ab'), equals(1));
+        expect(AiService.estimateTokenCount('abc'), equals(1));
+        expect(AiService.estimateTokenCount('abcd'), equals(1));
+        expect(AiService.estimateTokenCount('12345'), equals(1));
+        expect(AiService.estimateTokenCount('123456'), equals(2));
+        expect(AiService.estimateTokenCount('12345678'), equals(2));
+      },
+    );
+
+    test(
+      'handles imageBytes variations (null, empty Uint8List, non-empty Uint8List)',
+      () {
+        expect(
+          AiService.estimateTokenCount('12345678', imageBytes: null),
+          equals(2),
+        );
+        expect(
+          AiService.estimateTokenCount('12345678', imageBytes: Uint8List(0)),
+          equals(2),
+        );
+        expect(
+          AiService.estimateTokenCount(
+            '',
+            imageBytes: Uint8List.fromList([1, 2, 3]),
+          ),
+          equals(256),
+        );
+        expect(
+          AiService.estimateTokenCount(
+            '12345678',
+            imageBytes: Uint8List.fromList([10, 20, 30, 40]),
+          ),
+          equals(258),
+        );
+      },
+    );
+  });
+
   group('AiServiceJsonExtension.generateJson Tests', () {
     test('parses fenced JSON Map into a Dart Map', () async {
       final service = TestFakeAiService()

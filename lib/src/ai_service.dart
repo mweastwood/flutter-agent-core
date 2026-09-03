@@ -55,6 +55,15 @@ abstract class AiService {
     int? maxOutputTokens,
   });
 
+  /// Heuristic token estimator: ~4 characters per token + 256 tokens for images.
+  static int estimateTokenCount(String prompt, {Uint8List? imageBytes}) {
+    int count = (prompt.length / 4).round();
+    if (imageBytes != null && imageBytes.isNotEmpty) {
+      count += 256;
+    }
+    return count;
+  }
+
   Future<int> countTokens({required String prompt, Uint8List? imageBytes});
 
   Future<AiResponse?> generateContentRaw({
