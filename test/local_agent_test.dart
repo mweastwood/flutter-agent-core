@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -956,6 +957,34 @@ void main() {
         },
       );
 
+      test('retries configurable maxRetries count on failure', () async {
+        int attempts = 0;
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+              attempts++;
+              throw PlatformException(code: 'FAIL', message: 'Always fail');
+            });
+
+        // maxRetries = 0 -> 1 total attempt
+        final zeroRetryService = MethodChannelAiService(
+          maxRetries: 0,
+          initialRetryDelay: Duration.zero,
+        );
+        final res0 = await zeroRetryService.generateContentRaw(prompt: 'test');
+        expect(attempts, equals(1));
+        expect(res0!.isError, isTrue);
+
+        // maxRetries = 2 -> 3 total attempts
+        attempts = 0;
+        final twoRetryService = MethodChannelAiService(
+          maxRetries: 2,
+          initialRetryDelay: Duration.zero,
+        );
+        final res2 = await twoRetryService.generateContentRaw(prompt: 'test');
+        expect(attempts, equals(3));
+        expect(res2!.isError, isTrue);
+      });
+
       test(
         'catches outer exception when response parsing throws TypeError',
         () async {
@@ -976,6 +1005,119 @@ void main() {
           expect(response.text, contains('"error"'));
         },
       );
+    });
+
+    group('calculateBackoff', () {
+      test('scales exponentially without jitter', () {
+        final service = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        );
+
+        expect(
+          service.calculateBackoff(1),
+          equals(const Duration(milliseconds: 500)),
+        );
+        expect(
+          service.calculateBackoff(2),
+          equals(const Duration(milliseconds: 1000)),
+        );
+        expect(
+          service.calculateBackoff(3),
+          equals(const Duration(milliseconds: 2000)),
+        );
+        expect(
+          service.calculateBackoff(4),
+          equals(const Duration(milliseconds: 4000)),
+        );
+      });
+
+      test('clamps backoff at maxRetryDelay', () {
+        final service = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(milliseconds: 1500),
+          enableJitter: false,
+        );
+
+        expect(
+          service.calculateBackoff(1),
+          equals(const Duration(milliseconds: 500)),
+        );
+        expect(
+          service.calculateBackoff(2),
+          equals(const Duration(milliseconds: 1000)),
+        );
+        expect(
+          service.calculateBackoff(3),
+          equals(const Duration(milliseconds: 1500)),
+        );
+        expect(
+          service.calculateBackoff(4),
+          equals(const Duration(milliseconds: 1500)),
+        );
+      });
+
+      test('returns Duration.zero when boundedMs is 0', () {
+        final serviceZeroInitial = MethodChannelAiService(
+          initialRetryDelay: Duration.zero,
+        );
+        expect(serviceZeroInitial.calculateBackoff(1), equals(Duration.zero));
+
+        final serviceZeroMax = MethodChannelAiService(
+          maxRetryDelay: Duration.zero,
+        );
+        expect(serviceZeroMax.calculateBackoff(1), equals(Duration.zero));
+      });
+
+      test('prevents bit-shift overflow for large attempt counts', () {
+        final service = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        );
+
+        expect(
+          service.calculateBackoff(65),
+          equals(const Duration(seconds: 15)),
+        );
+        expect(
+          service.calculateBackoff(100),
+          equals(const Duration(seconds: 15)),
+        );
+      });
+
+      test('produces deterministic output with seeded random and jitter', () {
+        final service1 = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 500),
+          enableJitter: true,
+          random: Random(42),
+        );
+        final service2 = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 500),
+          enableJitter: true,
+          random: Random(42),
+        );
+
+        final backoff1 = service1.calculateBackoff(1);
+        final backoff2 = service2.calculateBackoff(1);
+        expect(backoff1, equals(backoff2));
+      });
+
+      test('applies jitter within +/-25% bounds', () {
+        final service = MethodChannelAiService(
+          initialRetryDelay: const Duration(milliseconds: 1000),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: true,
+        );
+
+        for (int i = 0; i < 20; i++) {
+          final backoff = service.calculateBackoff(1);
+          // 1000ms with +/-25% jitter is between 750ms and 1250ms
+          expect(backoff.inMilliseconds, greaterThanOrEqualTo(750));
+          expect(backoff.inMilliseconds, lessThanOrEqualTo(1250));
+        }
+      });
     });
   });
 
