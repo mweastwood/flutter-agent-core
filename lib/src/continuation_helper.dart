@@ -18,7 +18,6 @@ final _reCommonConversationalHeaders = [
   RegExp(r'^\s*continuation:\s*', caseSensitive: false),
 ];
 
-@visibleForTesting
 bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
   if (nativeIsTruncated) return true;
 

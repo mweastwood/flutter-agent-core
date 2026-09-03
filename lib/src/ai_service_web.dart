@@ -72,7 +72,7 @@ class WebAiService extends AiService {
   }) async {}
 
   @override
-  Future<String?> generateContent({
+  Future<AiResponse?> generateContentRaw({
     required String prompt,
     Uint8List? imageBytes,
     double temperature = 1.0,
@@ -84,11 +84,37 @@ class WebAiService extends AiService {
 
       final jsResponse = await ai.getNextStroke(prompt.toJS, ''.toJS).toDart;
       final String? response = (jsResponse as JSString?)?.toDart;
-      return response;
+      if (response == null) return null;
+
+      return AiResponse(
+        text: response,
+        isTruncated: isTruncatedHeuristic(response, false),
+        isError: false,
+      );
     } catch (e) {
       debugPrint('Error generating content from Web AI: $e');
+      return AiResponse(
+        text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
+        isTruncated: false,
+        isError: true,
+      );
     }
-    return null;
+  }
+
+  @override
+  Future<String?> generateContent({
+    required String prompt,
+    Uint8List? imageBytes,
+    double temperature = 1.0,
+    int? maxOutputTokens,
+  }) async {
+    final res = await generateContentRaw(
+      prompt: prompt,
+      imageBytes: imageBytes,
+      temperature: temperature,
+      maxOutputTokens: maxOutputTokens,
+    );
+    return res?.text;
   }
 
   @override

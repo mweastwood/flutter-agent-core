@@ -522,5 +522,63 @@ void main() {
         expect(text, equals('Alpha continuation, Beta continuation, '));
       },
     );
+
+    test(
+      'triggers auto-continuation loop when initial response text matches truncation heuristic even if isTruncated is false',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(text: '{"items": ["first",', isTruncated: false),
+          AiResponse(text: ' "second"]}', isTruncated: false),
+        ]);
+
+        final text = await service.generateContentWithContinuation(
+          prompt: 'get items json',
+          autoContinueLimit: 2,
+        );
+        expect(text, equals('{"items": ["first", "second"]}'));
+        expect(service.callIndex, equals(2));
+      },
+    );
+
+    test(
+      'returns error text immediately without continuing when generateContentRaw returns isError: true on first call',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(
+            text: '{"error": "Web AI internal error"}',
+            isTruncated: false,
+            isError: true,
+          ),
+        ]);
+
+        final text = await service.generateContentWithContinuation(
+          prompt: 'failing call',
+          autoContinueLimit: 3,
+        );
+        expect(text, equals('{"error": "Web AI internal error"}'));
+        expect(service.callIndex, equals(1));
+      },
+    );
+
+    test(
+      'stops auto-continuation loop and returns accumulated text when subsequent call returns isError: true',
+      () async {
+        final service = TestContinuationAiService([
+          AiResponse(text: 'Part one of the message, ', isTruncated: true),
+          AiResponse(
+            text: '{"error": "Disconnected"}',
+            isTruncated: false,
+            isError: true,
+          ),
+        ]);
+
+        final text = await service.generateContentWithContinuation(
+          prompt: 'continue until error',
+          autoContinueLimit: 3,
+        );
+        expect(text, equals('Part one of the message, '));
+        expect(service.callIndex, equals(2));
+      },
+    );
   });
 }
