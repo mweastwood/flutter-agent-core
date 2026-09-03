@@ -200,6 +200,15 @@ void main() {
       expect(isTruncatedHeuristic('[1, 2]', false), isFalse);
       expect(isTruncatedHeuristic('test', true), isTrue);
       expect(isTruncatedHeuristic('', false), isFalse);
+      expect(
+        isTruncatedHeuristic(r'{"code": "print(```x```)"}', false),
+        isFalse,
+      );
+      expect(isTruncatedHeuristic('```dart\nvoid main() {', false), isTrue);
+      expect(
+        isTruncatedHeuristic('```dart\nvoid main() {}\n```', false),
+        isFalse,
+      );
     });
 
     test('cleanContinuationChunk strips fences and headers', () {
