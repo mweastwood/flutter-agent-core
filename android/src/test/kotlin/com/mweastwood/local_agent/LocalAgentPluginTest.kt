@@ -6,6 +6,8 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.mockito.Mockito
 import kotlin.test.Test
+import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 
 /*
  * This demonstrates a simple unit test of the Kotlin portion of this plugin's implementation.
@@ -19,7 +21,9 @@ internal class LocalAgentPluginTest {
     @Test
     fun testPluginInstantiation() {
         val plugin = LocalAgentPlugin()
-        assert(plugin != null)
+        assertNotNull(plugin)
+        assertIs<FlutterPlugin>(plugin)
+        assertIs<MethodChannel.MethodCallHandler>(plugin)
     }
 
     @Test
