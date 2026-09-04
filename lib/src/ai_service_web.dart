@@ -1,42 +1,33 @@
-import 'dart:js_interop';
-
 import 'package:flutter/foundation.dart';
 
 import 'ai_service.dart';
+import 'chrome_ai_client.dart';
+
+export 'chrome_ai_client.dart';
 
 AiService getWebAiService() {
   return WebAiService();
 }
 
-@JS('chromeAi')
-external ChromeAi? get chromeAi;
-
-@JS()
-@staticInterop
-class ChromeAi {}
-
-extension ChromeAiExtension on ChromeAi {
-  external JSPromise checkStatus();
-  external JSPromise triggerDownload();
-  external JSPromise getNextStroke(JSString prompt, JSString systemInstruction);
-}
-
 class WebAiService extends AiService {
+  final ChromeAiClient? _client;
+
+  WebAiService({ChromeAiClient? client})
+      : _client = client ?? defaultChromeAiClient;
+
   @override
   Future<AiCoreStatus> checkStatus() async {
     try {
-      final ai = chromeAi;
-      if (ai == null) {
+      final client = _client;
+      if (client == null) {
         debugPrint(
           'Web AI checkStatus: window.chromeAi is null (check if script in index.html ran successfully)',
         );
         return AiCoreStatus.unavailable;
       }
 
-      final jsStatus = await ai.checkStatus().toDart;
-      final String result = (jsStatus as JSString).toDart;
-
-      switch (result) {
+      final status = await client.checkStatus();
+      switch (status) {
         case 'readily':
           return AiCoreStatus.available;
         case 'after-download':
@@ -56,10 +47,10 @@ class WebAiService extends AiService {
       if (delay != null) {
         await Future.delayed(delay);
       }
-      final ai = chromeAi;
-      if (ai == null) return;
+      final client = _client;
+      if (client == null) return;
 
-      await ai.triggerDownload().toDart;
+      await client.triggerDownload();
     } catch (e) {
       debugPrint('Error triggering download: $e');
     }
@@ -79,11 +70,10 @@ class WebAiService extends AiService {
     int? maxOutputTokens,
   }) async {
     try {
-      final ai = chromeAi;
-      if (ai == null) return null;
+      final client = _client;
+      if (client == null) return null;
 
-      final jsResponse = await ai.getNextStroke(prompt.toJS, ''.toJS).toDart;
-      final String? response = (jsResponse as JSString?)?.toDart;
+      final response = await client.getNextStroke(prompt, '');
       if (response == null) return null;
 
       return AiResponse(

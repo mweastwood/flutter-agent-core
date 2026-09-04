@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'ai_service_method_channel.dart';
 import 'ai_service_mock.dart';
-import 'ai_service_stub.dart' if (dart.library.html) 'ai_service_web.dart';
+import 'ai_service_stub.dart'
+    if (dart.library.js_interop) 'ai_service_web.dart'
+    if (dart.library.html) 'ai_service_web.dart';
 import 'continuation_helper.dart';
 import 'json_utils.dart';
 
