@@ -47,8 +47,9 @@ class WebChromeAiClient implements ChromeAiClient {
     final ai = chromeAi;
     if (ai == null) return null;
 
-    final jsResponse =
-        await ai.getNextStroke(prompt.toJS, systemInstruction.toJS).toDart;
+    final jsResponse = await ai
+        .getNextStroke(prompt.toJS, systemInstruction.toJS)
+        .toDart;
     return (jsResponse as JSString?)?.toDart;
   }
 }

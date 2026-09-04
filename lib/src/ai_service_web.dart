@@ -13,7 +13,7 @@ class WebAiService extends AiService {
   final ChromeAiClient? _client;
 
   WebAiService({ChromeAiClient? client})
-      : _client = client ?? defaultChromeAiClient;
+    : _client = client ?? defaultChromeAiClient;
 
   @override
   Future<AiCoreStatus> checkStatus() async {

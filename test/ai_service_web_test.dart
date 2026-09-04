@@ -70,15 +70,18 @@ void main() {
         expect(client.checkStatusCallCount, equals(1));
       });
 
-      test('maps unhandled status strings to AiCoreStatus.unavailable', () async {
-        for (final unhandled in ['no', 'downloading', 'unknown', '']) {
-          final client = TestChromeAiClient()..statusResult = unhandled;
-          final service = WebAiService(client: client);
+      test(
+        'maps unhandled status strings to AiCoreStatus.unavailable',
+        () async {
+          for (final unhandled in ['no', 'downloading', 'unknown', '']) {
+            final client = TestChromeAiClient()..statusResult = unhandled;
+            final service = WebAiService(client: client);
 
-          final status = await service.checkStatus();
-          expect(status, equals(AiCoreStatus.unavailable));
-        }
-      });
+            final status = await service.checkStatus();
+            expect(status, equals(AiCoreStatus.unavailable));
+          }
+        },
+      );
 
       test('maps null status to AiCoreStatus.unavailable', () async {
         final client = TestChromeAiClient()..statusResult = null;
@@ -88,14 +91,19 @@ void main() {
         expect(status, equals(AiCoreStatus.unavailable));
       });
 
-      test('catches client exceptions and returns AiCoreStatus.unavailable gracefully', () async {
-        final client = TestChromeAiClient()
-          ..statusError = Exception('Browser JS error accessing window.chromeAi');
-        final service = WebAiService(client: client);
+      test(
+        'catches client exceptions and returns AiCoreStatus.unavailable gracefully',
+        () async {
+          final client = TestChromeAiClient()
+            ..statusError = Exception(
+              'Browser JS error accessing window.chromeAi',
+            );
+          final service = WebAiService(client: client);
 
-        final status = await service.checkStatus();
-        expect(status, equals(AiCoreStatus.unavailable));
-      });
+          final status = await service.checkStatus();
+          expect(status, equals(AiCoreStatus.unavailable));
+        },
+      );
 
       test('returns AiCoreStatus.unavailable when client is null', () async {
         final service = WebAiService(client: null);
@@ -127,14 +135,17 @@ void main() {
         expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(40));
       });
 
-      test('catches client exceptions during triggerDownload without propagating', () async {
-        final client = TestChromeAiClient()
-          ..triggerDownloadError = Exception('Download failed in browser');
-        final service = WebAiService(client: client);
+      test(
+        'catches client exceptions during triggerDownload without propagating',
+        () async {
+          final client = TestChromeAiClient()
+            ..triggerDownloadError = Exception('Download failed in browser');
+          final service = WebAiService(client: client);
 
-        await expectLater(service.triggerDownload(), completes);
-        expect(client.triggerDownloadCalled, isTrue);
-      });
+          await expectLater(service.triggerDownload(), completes);
+          expect(client.triggerDownloadCalled, isTrue);
+        },
+      );
 
       test('null client is a safe no-op with and without delay', () async {
         final service = WebAiService(client: null);
@@ -148,22 +159,27 @@ void main() {
     });
 
     group('Content Generation in generateContentRaw', () {
-      test('returns AiResponse with isError: false and properly computed isTruncated', () async {
-        final client = TestChromeAiClient()..nextStrokeResult = 'This is a complete response.';
-        final service = WebAiService(client: client);
+      test(
+        'returns AiResponse with isError: false and properly computed isTruncated',
+        () async {
+          final client = TestChromeAiClient()
+            ..nextStrokeResult = 'This is a complete response.';
+          final service = WebAiService(client: client);
 
-        final response = await service.generateContentRaw(prompt: 'Hello AI');
-        expect(response, isNotNull);
-        expect(response!.text, equals('This is a complete response.'));
-        expect(response.isError, isFalse);
-        expect(response.isTruncated, isFalse);
-        expect(client.capturedPrompt, equals('Hello AI'));
-        expect(client.capturedSystemInstruction, equals(''));
-      });
+          final response = await service.generateContentRaw(prompt: 'Hello AI');
+          expect(response, isNotNull);
+          expect(response!.text, equals('This is a complete response.'));
+          expect(response.isError, isFalse);
+          expect(response.isTruncated, isFalse);
+          expect(client.capturedPrompt, equals('Hello AI'));
+          expect(client.capturedSystemInstruction, equals(''));
+        },
+      );
 
       test('returns isTruncated: true for cut-off code block', () async {
         final client = TestChromeAiClient()
-          ..nextStrokeResult = '```dart\nvoid main() {\n  print("incomplete code';
+          ..nextStrokeResult =
+              '```dart\nvoid main() {\n  print("incomplete code';
         final service = WebAiService(client: client);
 
         final response = await service.generateContentRaw(prompt: 'Write code');
@@ -187,60 +203,78 @@ void main() {
         expect(response, isNull);
       });
 
-      test('catches exception and returns AiResponse with isError: true and escaped JSON', () async {
-        final client = TestChromeAiClient()
-          ..nextStrokeError = Exception('Prompt failed: "rate-limited"');
-        final service = WebAiService(client: client);
+      test(
+        'catches exception and returns AiResponse with isError: true and escaped JSON',
+        () async {
+          final client = TestChromeAiClient()
+            ..nextStrokeError = Exception('Prompt failed: "rate-limited"');
+          final service = WebAiService(client: client);
 
-        final response = await service.generateContentRaw(prompt: 'Hello');
-        expect(response, isNotNull);
-        expect(response!.isError, isTrue);
-        expect(response.isTruncated, isFalse);
-        expect(
-          response.text,
-          equals('{"error": "Exception: Prompt failed: \\"rate-limited\\""}'),
-        );
-      });
+          final response = await service.generateContentRaw(prompt: 'Hello');
+          expect(response, isNotNull);
+          expect(response!.isError, isTrue);
+          expect(response.isTruncated, isFalse);
+          expect(
+            response.text,
+            equals('{"error": "Exception: Prompt failed: \\"rate-limited\\""}'),
+          );
+        },
+      );
     });
 
     group('Delegation in generateContent & Utilities', () {
-      test('generateContent delegates to generateContentRaw and extracts text string', () async {
-        final client = TestChromeAiClient()..nextStrokeResult = 'Extracted answer';
-        final service = WebAiService(client: client);
+      test(
+        'generateContent delegates to generateContentRaw and extracts text string',
+        () async {
+          final client = TestChromeAiClient()
+            ..nextStrokeResult = 'Extracted answer';
+          final service = WebAiService(client: client);
 
-        final text = await service.generateContent(prompt: 'What is 2+2?');
-        expect(text, equals('Extracted answer'));
-      });
+          final text = await service.generateContent(prompt: 'What is 2+2?');
+          expect(text, equals('Extracted answer'));
+        },
+      );
 
-      test('generateContent returns null when generateContentRaw returns null', () async {
-        final client = TestChromeAiClient()..nextStrokeResult = null;
-        final service = WebAiService(client: client);
+      test(
+        'generateContent returns null when generateContentRaw returns null',
+        () async {
+          final client = TestChromeAiClient()..nextStrokeResult = null;
+          final service = WebAiService(client: client);
 
-        final text = await service.generateContent(prompt: 'What is 2+2?');
-        expect(text, isNull);
-      });
+          final text = await service.generateContent(prompt: 'What is 2+2?');
+          expect(text, isNull);
+        },
+      );
 
       test('setModelConfig completes safely as a no-op', () async {
         final service = WebAiService(client: TestChromeAiClient());
 
         await expectLater(
-          service.setModelConfig(releaseStage: 'experimental', preference: 'speed'),
+          service.setModelConfig(
+            releaseStage: 'experimental',
+            preference: 'speed',
+          ),
           completes,
         );
       });
 
-      test('countTokens estimates token count based on prompt and imageBytes', () async {
-        final service = WebAiService(client: TestChromeAiClient());
+      test(
+        'countTokens estimates token count based on prompt and imageBytes',
+        () async {
+          final service = WebAiService(client: TestChromeAiClient());
 
-        final promptOnlyTokens = await service.countTokens(prompt: 'Hello world! 1234');
-        expect(promptOnlyTokens, greaterThan(0));
+          final promptOnlyTokens = await service.countTokens(
+            prompt: 'Hello world! 1234',
+          );
+          expect(promptOnlyTokens, greaterThan(0));
 
-        final withImageTokens = await service.countTokens(
-          prompt: 'Hello world! 1234',
-          imageBytes: Uint8List(100),
-        );
-        expect(withImageTokens, greaterThan(promptOnlyTokens));
-      });
+          final withImageTokens = await service.countTokens(
+            prompt: 'Hello world! 1234',
+            imageBytes: Uint8List(100),
+          );
+          expect(withImageTokens, greaterThan(promptOnlyTokens));
+        },
+      );
 
       test('getWebAiService factory returns WebAiService instance', () {
         final service = getWebAiService();
