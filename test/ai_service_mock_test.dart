@@ -48,7 +48,9 @@ void main() {
 
     test('triggerDownload allows overriding delay parameter', () {
       fakeAsync((async) {
-        final service = MockAiService(downloadDelay: const Duration(seconds: 10));
+        final service = MockAiService(
+          downloadDelay: const Duration(seconds: 10),
+        );
         service.setMockStatus(AiCoreStatus.downloadable);
 
         final downloadFuture = service.triggerDownload(

@@ -1181,71 +1181,59 @@ void main() {
   });
 
   group('MockAiService Tests', () {
-    test(
-      'triggerDownload transitions status with custom delay parameter',
-      () {
-        fakeAsync((async) {
-          final mock = MockAiService();
-          mock.setMockStatus(AiCoreStatus.downloadable);
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.downloadable)),
-          );
-          async.flushMicrotasks();
+    test('triggerDownload transitions status with custom delay parameter', () {
+      fakeAsync((async) {
+        final mock = MockAiService();
+        mock.setMockStatus(AiCoreStatus.downloadable);
+        expect(
+          mock.checkStatus(),
+          completion(equals(AiCoreStatus.downloadable)),
+        );
+        async.flushMicrotasks();
 
-          final future = mock.triggerDownload(
-            delay: const Duration(milliseconds: 50),
-          );
-          expect(async.elapsed, equals(Duration.zero));
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.downloading)),
-          );
-          async.flushMicrotasks();
+        final future = mock.triggerDownload(
+          delay: const Duration(milliseconds: 50),
+        );
+        expect(async.elapsed, equals(Duration.zero));
+        expect(
+          mock.checkStatus(),
+          completion(equals(AiCoreStatus.downloading)),
+        );
+        async.flushMicrotasks();
 
-          async.elapse(const Duration(milliseconds: 50));
-          expect(future, completes);
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.available)),
-          );
-          async.flushMicrotasks();
-        });
-      },
-    );
+        async.elapse(const Duration(milliseconds: 50));
+        expect(future, completes);
+        expect(mock.checkStatus(), completion(equals(AiCoreStatus.available)));
+        async.flushMicrotasks();
+      });
+    });
 
-    test(
-      'triggerDownload uses default delay when parameter is omitted',
-      () {
-        fakeAsync((async) {
-          final mock = MockAiService(
-            downloadDelay: const Duration(milliseconds: 50),
-          );
-          mock.setMockStatus(AiCoreStatus.downloadable);
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.downloadable)),
-          );
-          async.flushMicrotasks();
+    test('triggerDownload uses default delay when parameter is omitted', () {
+      fakeAsync((async) {
+        final mock = MockAiService(
+          downloadDelay: const Duration(milliseconds: 50),
+        );
+        mock.setMockStatus(AiCoreStatus.downloadable);
+        expect(
+          mock.checkStatus(),
+          completion(equals(AiCoreStatus.downloadable)),
+        );
+        async.flushMicrotasks();
 
-          final future = mock.triggerDownload();
-          expect(async.elapsed, equals(Duration.zero));
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.downloading)),
-          );
-          async.flushMicrotasks();
+        final future = mock.triggerDownload();
+        expect(async.elapsed, equals(Duration.zero));
+        expect(
+          mock.checkStatus(),
+          completion(equals(AiCoreStatus.downloading)),
+        );
+        async.flushMicrotasks();
 
-          async.elapse(const Duration(milliseconds: 50));
-          expect(future, completes);
-          expect(
-            mock.checkStatus(),
-            completion(equals(AiCoreStatus.available)),
-          );
-          async.flushMicrotasks();
-        });
-      },
-    );
+        async.elapse(const Duration(milliseconds: 50));
+        expect(future, completes);
+        expect(mock.checkStatus(), completion(equals(AiCoreStatus.available)));
+        async.flushMicrotasks();
+      });
+    });
   });
 
   group('Auto-Continuation Tests', () {
