@@ -1,3 +1,4 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
 import 'package:flutter_agent_core/src/ai_service_stub.dart'
@@ -394,18 +395,34 @@ void main() {
   group('MockAiService Tests', () {
     test(
       'triggerDownload with configurable downloadDelay transitions status to downloading and then available',
-      () async {
-        final service = MockAiService(
-          downloadDelay: const Duration(milliseconds: 10),
-        );
-        service.setMockStatus(AiCoreStatus.downloadable);
-        expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
+      () {
+        fakeAsync((async) {
+          final service = MockAiService(
+            downloadDelay: const Duration(milliseconds: 10),
+          );
+          service.setMockStatus(AiCoreStatus.downloadable);
+          expect(
+            service.checkStatus(),
+            completion(equals(AiCoreStatus.downloadable)),
+          );
+          async.flushMicrotasks();
 
-        final future = service.triggerDownload();
-        expect(await service.checkStatus(), equals(AiCoreStatus.downloading));
+          final future = service.triggerDownload();
+          expect(async.elapsed, equals(Duration.zero));
+          expect(
+            service.checkStatus(),
+            completion(equals(AiCoreStatus.downloading)),
+          );
+          async.flushMicrotasks();
 
-        await future;
-        expect(await service.checkStatus(), equals(AiCoreStatus.available));
+          async.elapse(const Duration(milliseconds: 10));
+          expect(future, completes);
+          expect(
+            service.checkStatus(),
+            completion(equals(AiCoreStatus.available)),
+          );
+          async.flushMicrotasks();
+        });
       },
     );
 
