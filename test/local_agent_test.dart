@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
@@ -1182,34 +1183,67 @@ void main() {
   group('MockAiService Tests', () {
     test(
       'triggerDownload transitions status with custom delay parameter',
-      () async {
-        final mock = MockAiService();
-        mock.setMockStatus(AiCoreStatus.downloadable);
-        expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
+      () {
+        fakeAsync((async) {
+          final mock = MockAiService();
+          mock.setMockStatus(AiCoreStatus.downloadable);
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.downloadable)),
+          );
+          async.flushMicrotasks();
 
-        final future = mock.triggerDownload(
-          delay: const Duration(milliseconds: 50),
-        );
-        expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
+          final future = mock.triggerDownload(
+            delay: const Duration(milliseconds: 50),
+          );
+          expect(async.elapsed, equals(Duration.zero));
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.downloading)),
+          );
+          async.flushMicrotasks();
 
-        await future;
-        expect(await mock.checkStatus(), equals(AiCoreStatus.available));
+          async.elapse(const Duration(milliseconds: 50));
+          expect(future, completes);
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.available)),
+          );
+          async.flushMicrotasks();
+        });
       },
     );
 
     test(
       'triggerDownload uses default delay when parameter is omitted',
-      () async {
-        final mock = MockAiService(
-          downloadDelay: const Duration(milliseconds: 50),
-        );
-        mock.setMockStatus(AiCoreStatus.downloadable);
-        expect(await mock.checkStatus(), equals(AiCoreStatus.downloadable));
+      () {
+        fakeAsync((async) {
+          final mock = MockAiService(
+            downloadDelay: const Duration(milliseconds: 50),
+          );
+          mock.setMockStatus(AiCoreStatus.downloadable);
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.downloadable)),
+          );
+          async.flushMicrotasks();
 
-        final future = mock.triggerDownload();
-        expect(await mock.checkStatus(), equals(AiCoreStatus.downloading));
-        await future;
-        expect(await mock.checkStatus(), equals(AiCoreStatus.available));
+          final future = mock.triggerDownload();
+          expect(async.elapsed, equals(Duration.zero));
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.downloading)),
+          );
+          async.flushMicrotasks();
+
+          async.elapse(const Duration(milliseconds: 50));
+          expect(future, completes);
+          expect(
+            mock.checkStatus(),
+            completion(equals(AiCoreStatus.available)),
+          );
+          async.flushMicrotasks();
+        });
       },
     );
   });
