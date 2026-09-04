@@ -190,6 +190,91 @@ void main() {
         }),
       );
     });
+
+    test('handles unmatched closing brace in array context', () {
+      // Enclosed array context: inner array auto-closes and outer object consumes '}'
+      final enclosed1 = repairJson('{"items": [1, 2, }');
+      expect(enclosed1, equals('{"items": [1, 2]}'));
+      expect(
+        jsonDecode(enclosed1),
+        equals({
+          'items': [1, 2],
+        }),
+      );
+
+      final enclosed2 = repairJson('{"list": [{"key": "value"}, 10, }');
+      expect(enclosed2, equals('{"list": [{"key": "value"}, 10]}'));
+      expect(
+        jsonDecode(enclosed2),
+        equals({
+          'list': [
+            {'key': 'value'},
+            10,
+          ],
+        }),
+      );
+
+      // Standalone array context: inner array auto-closes and stray '}' is emitted
+      final standalone1 = repairJson('[1, 2, }');
+      expect(standalone1, equals('[1, 2]}'));
+
+      final standalone2 = repairJson('[{"key": "value"}, 10, }');
+      expect(standalone2, equals('[{"key": "value"}, 10]}'));
+    });
+
+    test('handles unmatched closing bracket in object context', () {
+      // Enclosed object context: incomplete key rolled back, inner object auto-closes, and outer array consumes ']'
+      final enclosed1 = repairJson('[{"a": 1, "b": ]');
+      expect(enclosed1, equals('[{"a": 1}]'));
+      expect(
+        jsonDecode(enclosed1),
+        equals([
+          {'a': 1},
+        ]),
+      );
+
+      final enclosed2 = repairJson('[{"a": 1, "b": 2, ]');
+      expect(enclosed2, equals('[{"a": 1, "b": 2}]'));
+      expect(
+        jsonDecode(enclosed2),
+        equals([
+          {'a': 1, 'b': 2},
+        ]),
+      );
+
+      // Standalone object context: incomplete key rolled back, object auto-closes, and stray ']' is emitted
+      final standalone = repairJson('{"a": 1, "b": ]');
+      expect(standalone, equals('{"a": 1}]'));
+    });
+
+    test(
+      'handles explicit array closing directly following trailing comma',
+      () {
+        final array1 = repairJson('[1, 2, ]');
+        expect(array1, equals('[1, 2]'));
+        expect(jsonDecode(array1), equals([1, 2]));
+
+        final array2 = repairJson('["alpha", "beta",  ]');
+        expect(array2, equals('["alpha", "beta"]'));
+        expect(jsonDecode(array2), equals(['alpha', 'beta']));
+
+        final array3 = repairJson('[{"id": 1}, ]');
+        expect(array3, equals('[{"id": 1}]'));
+        expect(
+          jsonDecode(array3),
+          equals([
+            {'id': 1},
+          ]),
+        );
+      },
+    );
+
+    test('handles stray closing delimiters with empty container stack', () {
+      expect(repairJson('}'), equals('}'));
+      expect(repairJson(']'), equals(']'));
+      expect(repairJson('}  '), equals('}  '));
+      expect(repairJson(']  '), equals(']  '));
+    });
   });
 
   group('Heuristic and Chunk Cleaning Tests', () {
