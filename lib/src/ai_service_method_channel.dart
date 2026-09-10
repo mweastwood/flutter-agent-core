@@ -27,25 +27,13 @@ class MethodChannelAiService extends AiService {
 
   @visibleForTesting
   Duration calculateBackoff(int attempt) {
-    final expFactor = 1 << (attempt - 1).clamp(0, 30);
-    final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
-    final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
-
-    if (boundedMs == 0) {
-      return Duration.zero;
-    }
-
-    if (!enableJitter) {
-      return Duration(milliseconds: boundedMs);
-    }
-
-    final rnd = random ?? Random();
-    final jitterRange = min(1000, (boundedMs * 0.25).round());
-    final jitter = jitterRange > 0
-        ? (rnd.nextInt(jitterRange * 2) - jitterRange)
-        : 0;
-    final finalMs = max(1, boundedMs + jitter);
-    return Duration(milliseconds: finalMs);
+    return AiService.calculateExponentialBackoff(
+      attempt: attempt,
+      initialRetryDelay: initialRetryDelay,
+      maxRetryDelay: maxRetryDelay,
+      enableJitter: enableJitter,
+      random: random,
+    );
   }
 
   @override

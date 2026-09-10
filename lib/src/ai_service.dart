@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -64,6 +65,35 @@ abstract class AiService {
       count += 256;
     }
     return count;
+  }
+
+  /// Calculates exponential backoff with optional jitter and clamping.
+  static Duration calculateExponentialBackoff({
+    required int attempt,
+    required Duration initialRetryDelay,
+    required Duration maxRetryDelay,
+    bool enableJitter = true,
+    Random? random,
+  }) {
+    final expFactor = 1 << (attempt - 1).clamp(0, 30);
+    final calculatedMs = initialRetryDelay.inMilliseconds * expFactor;
+    final boundedMs = calculatedMs.clamp(0, maxRetryDelay.inMilliseconds);
+
+    if (boundedMs == 0) {
+      return Duration.zero;
+    }
+
+    if (!enableJitter) {
+      return Duration(milliseconds: boundedMs);
+    }
+
+    final rnd = random ?? Random();
+    final jitterRange = min(1000, (boundedMs * 0.25).round());
+    final jitter = jitterRange > 0
+        ? (rnd.nextInt(jitterRange * 2) - jitterRange)
+        : 0;
+    final finalMs = max(1, boundedMs + jitter);
+    return Duration(milliseconds: finalMs);
   }
 
   Future<int> countTokens({required String prompt, Uint8List? imageBytes});

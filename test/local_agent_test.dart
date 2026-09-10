@@ -1180,6 +1180,163 @@ void main() {
     });
   });
 
+  group('AiService.calculateExponentialBackoff Tests', () {
+    test('scales exponentially without jitter', () {
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 500)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 2,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 1000)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 3,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 2000)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 4,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 4000)),
+      );
+    });
+
+    test(
+      'clamps backoff at maxRetryDelay and bit-shift overflow immunity with large attempts',
+      () {
+        expect(
+          AiService.calculateExponentialBackoff(
+            attempt: 3,
+            initialRetryDelay: const Duration(milliseconds: 500),
+            maxRetryDelay: const Duration(milliseconds: 1500),
+            enableJitter: false,
+          ),
+          equals(const Duration(milliseconds: 1500)),
+        );
+        expect(
+          AiService.calculateExponentialBackoff(
+            attempt: 4,
+            initialRetryDelay: const Duration(milliseconds: 500),
+            maxRetryDelay: const Duration(milliseconds: 1500),
+            enableJitter: false,
+          ),
+          equals(const Duration(milliseconds: 1500)),
+        );
+        expect(
+          AiService.calculateExponentialBackoff(
+            attempt: 65,
+            initialRetryDelay: const Duration(milliseconds: 500),
+            maxRetryDelay: const Duration(seconds: 15),
+            enableJitter: false,
+          ),
+          equals(const Duration(seconds: 15)),
+        );
+        expect(
+          AiService.calculateExponentialBackoff(
+            attempt: 100,
+            initialRetryDelay: const Duration(milliseconds: 500),
+            maxRetryDelay: const Duration(seconds: 15),
+            enableJitter: false,
+          ),
+          equals(const Duration(seconds: 15)),
+        );
+      },
+    );
+
+    test('returns Duration.zero for 0ms initial or max delay', () {
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: Duration.zero,
+          maxRetryDelay: const Duration(seconds: 15),
+        ),
+        equals(Duration.zero),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: Duration.zero,
+        ),
+        equals(Duration.zero),
+      );
+    });
+
+    test(
+      'applies jitter within +/-25% bounds (up to +/-1000ms) and enforces floor',
+      () {
+        for (int i = 0; i < 20; i++) {
+          final backoff = AiService.calculateExponentialBackoff(
+            attempt: 1,
+            initialRetryDelay: const Duration(milliseconds: 1000),
+            maxRetryDelay: const Duration(seconds: 15),
+            enableJitter: true,
+          );
+          expect(backoff.inMilliseconds, greaterThanOrEqualTo(750));
+          expect(backoff.inMilliseconds, lessThanOrEqualTo(1250));
+        }
+
+        for (int i = 0; i < 20; i++) {
+          final backoff = AiService.calculateExponentialBackoff(
+            attempt: 1,
+            initialRetryDelay: const Duration(milliseconds: 10000),
+            maxRetryDelay: const Duration(seconds: 20),
+            enableJitter: true,
+          );
+          expect(backoff.inMilliseconds, greaterThanOrEqualTo(9000));
+          expect(backoff.inMilliseconds, lessThanOrEqualTo(11000));
+        }
+
+        for (int i = 0; i < 20; i++) {
+          final backoff = AiService.calculateExponentialBackoff(
+            attempt: 1,
+            initialRetryDelay: const Duration(milliseconds: 1),
+            maxRetryDelay: const Duration(seconds: 5),
+            enableJitter: true,
+          );
+          expect(backoff.inMilliseconds, greaterThanOrEqualTo(1));
+        }
+      },
+    );
+
+    test('produces deterministic output with seeded random', () {
+      final backoff1 = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 500),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: Random(42),
+      );
+      final backoff2 = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 500),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: Random(42),
+      );
+      expect(backoff1, equals(backoff2));
+    });
+  });
+
   group('MockAiService Tests', () {
     test('triggerDownload transitions status with custom delay parameter', () {
       fakeAsync((async) {
