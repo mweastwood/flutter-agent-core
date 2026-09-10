@@ -1,5 +1,13 @@
 import 'dart:convert';
 
+final RegExp _singleLineFenceRegex = RegExp(
+  r'^```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```$',
+);
+
+final RegExp _unclosedSingleLineFenceRegex = RegExp(
+  r'^```[a-zA-Z0-9_-]*\s*(.*)$',
+);
+
 /// Strips markdown code fences (e.g. ```json ... ```) wrapping [text].
 ///
 /// Handles optional language tags (e.g., `json`, `JSON`, `dart`), single-line
@@ -11,17 +19,13 @@ String stripMarkdownCodeFences(String text) {
   // Single-line code fence: ```json {"key": "value"}``` or ```{"key": "value"}```
   if (!cleaned.contains('\n')) {
     // Check for both opening and closing fence on a single line
-    final singleLineMatch = RegExp(
-      r'^```[a-zA-Z0-9_-]*\s*([\s\S]*?)\s*```$',
-    ).firstMatch(cleaned);
+    final singleLineMatch = _singleLineFenceRegex.firstMatch(cleaned);
     if (singleLineMatch != null) {
       return singleLineMatch.group(1)!.trim();
     }
     // Single line with unclosed opening fence: ```json {"key": "value"}
     if (cleaned.startsWith('```')) {
-      final unclosedMatch = RegExp(
-        r'^```[a-zA-Z0-9_-]*\s*(.*)$',
-      ).firstMatch(cleaned);
+      final unclosedMatch = _unclosedSingleLineFenceRegex.firstMatch(cleaned);
       if (unclosedMatch != null) {
         return unclosedMatch.group(1)!.trim();
       }
@@ -34,20 +38,22 @@ String stripMarkdownCodeFences(String text) {
     return cleaned;
   }
 
-  // Multi-line code fence
-  final lines = cleaned.split('\n');
-
-  // Strip opening fence line if present
-  if (lines.isNotEmpty && lines.first.trim().startsWith('```')) {
-    lines.removeAt(0);
+  // Multi-line code fence: scan and slice without full list materialization
+  final firstNewline = cleaned.indexOf('\n');
+  if (firstNewline != -1) {
+    final firstLine = cleaned.substring(0, firstNewline).trim();
+    if (firstLine.startsWith('```')) {
+      cleaned = cleaned.substring(firstNewline + 1).trim();
+    }
   }
 
-  // Strip closing fence line if present
-  if (lines.isNotEmpty && lines.last.trim().startsWith('```')) {
-    lines.removeLast();
+  final lastNewline = cleaned.lastIndexOf('\n');
+  if (lastNewline != -1) {
+    final lastLine = cleaned.substring(lastNewline + 1).trim();
+    if (lastLine.startsWith('```')) {
+      cleaned = cleaned.substring(0, lastNewline).trim();
+    }
   }
-
-  cleaned = lines.join('\n').trim();
 
   // Strip any trailing fence on the last line if attached directly to content (e.g. `}``` `)
   if (cleaned.endsWith('```')) {
