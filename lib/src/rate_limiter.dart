@@ -33,6 +33,9 @@ class RateLimiter {
       List.unmodifiable(_tokenUsage);
 
   @visibleForTesting
+  int get runningTokenSum => _runningTokenSum;
+
+  @visibleForTesting
   void recordRequestForTesting(DateTime timestamp, {int tokenCount = 0}) {
     _requestTimestamps.add(timestamp);
     _tokenUsage.add((timestamp: timestamp, tokenCount: tokenCount));
@@ -58,22 +61,18 @@ class RateLimiter {
   }
 
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
+    final now = _now();
+    _pruneExpiredRequests(now, const Duration(minutes: 1));
+    _pruneExpiredTokens(now, const Duration(minutes: 1));
+
     if (throttlePercentage <= 0.0) {
-      final actualRequestTime = _now();
-      _requestTimestamps.add(actualRequestTime);
-      _tokenUsage.add((
-        timestamp: actualRequestTime,
-        tokenCount: estimatedTokens,
-      ));
+      _requestTimestamps.add(now);
+      _tokenUsage.add((timestamp: now, tokenCount: estimatedTokens));
       _runningTokenSum += estimatedTokens;
       return;
     }
 
-    final now = _now();
     final double pctFactor = throttlePercentage / 100.0;
-
-    _pruneExpiredRequests(now, const Duration(minutes: 1));
-    _pruneExpiredTokens(now, const Duration(minutes: 1));
 
     if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
       final double effectiveRps = modelInfo.limitRps! * pctFactor;
