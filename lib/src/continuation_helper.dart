@@ -299,10 +299,16 @@ String repairJson(String json) {
           truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write(']');
+        if (stack.isNotEmpty) {
+          onValueCompleted(output.length);
+        }
       }
 
       if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
-        stack.removeLast();
+        final frame = stack.removeLast();
+        if (frame.objectState != _ObjectState.expectingCommaOrClose) {
+          truncateTo(frame.lastCompleteEntryEndPos);
+        }
         output.write('}');
         i++;
         onValueCompleted(output.length);
