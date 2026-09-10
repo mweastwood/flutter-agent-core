@@ -4,6 +4,7 @@ export 'src/ai_service_method_channel.dart';
 export 'src/ai_service_mock.dart';
 export 'src/continuation_helper.dart';
 export 'src/agent_harness.dart';
+export 'src/agent_history_entry.dart';
 export 'src/json_utils.dart';
 export 'src/model_database.dart';
 export 'src/model_info.dart';
