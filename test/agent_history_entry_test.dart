@@ -83,4 +83,87 @@ void main() {
       },
     );
   });
+
+  group('AgentHistoryEntry.fromJson totalTokens fallback and precedence', () {
+    test(
+      'falls back to sum of inputTokens and outputTokens when totalTokens is omitted or null',
+      () {
+        final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
+
+        final entryOmitted = direct.AgentHistoryEntry.fromJson({
+          'timestamp': timestampStr,
+          'prompt': 'Prompt text',
+          'response': 'Response text',
+          'inputTokens': 120,
+          'outputTokens': 30,
+        });
+        expect(entryOmitted.inputTokens, equals(120));
+        expect(entryOmitted.outputTokens, equals(30));
+        expect(entryOmitted.totalTokens, equals(150));
+
+        final entryNull = direct.AgentHistoryEntry.fromJson({
+          'timestamp': timestampStr,
+          'prompt': 'Prompt text',
+          'response': 'Response text',
+          'inputTokens': 120,
+          'outputTokens': 30,
+          'totalTokens': null,
+        });
+        expect(entryNull.inputTokens, equals(120));
+        expect(entryNull.outputTokens, equals(30));
+        expect(entryNull.totalTokens, equals(150));
+      },
+    );
+
+    test('explicit totalTokens takes precedence over sum', () {
+      final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
+      final entry = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+        'inputTokens': 120,
+        'outputTokens': 30,
+        'totalTokens': 160,
+      });
+
+      expect(entry.inputTokens, equals(120));
+      expect(entry.outputTokens, equals(30));
+      expect(entry.totalTokens, equals(160));
+    });
+
+    test('totalTokens is null when tokens are partially or fully missing', () {
+      final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
+
+      final entryNullOutput = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+        'inputTokens': 100,
+        'outputTokens': null,
+      });
+      expect(entryNullOutput.inputTokens, equals(100));
+      expect(entryNullOutput.outputTokens, isNull);
+      expect(entryNullOutput.totalTokens, isNull);
+
+      final entryNullInput = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+        'inputTokens': null,
+        'outputTokens': 50,
+      });
+      expect(entryNullInput.inputTokens, isNull);
+      expect(entryNullInput.outputTokens, equals(50));
+      expect(entryNullInput.totalTokens, isNull);
+
+      final entryNeither = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+      });
+      expect(entryNeither.inputTokens, isNull);
+      expect(entryNeither.outputTokens, isNull);
+      expect(entryNeither.totalTokens, isNull);
+    });
+  });
 }
