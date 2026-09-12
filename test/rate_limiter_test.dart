@@ -296,6 +296,90 @@ void main() {
     });
 
     test(
+      'RateLimiter with throttlePercentage: 0.0 prunes expired request timestamps and token entries after 1 minute has elapsed',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-zero-throttle-prune-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10,
+            limitRpm: 120,
+            limitTpm: 100,
+            description: 'Test zero throttle pruning',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 0.0,
+            nowProvider: () => clock.now(),
+          );
+
+          final oldTimestamp = clock.now();
+          limiter.throttleBeforeRequest(100);
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(100));
+
+          // Elapse 30 seconds - still within 1-minute window
+          async.elapse(const Duration(seconds: 30));
+          limiter.throttleBeforeRequest(50);
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.tokenUsage.length, equals(2));
+          expect(limiter.runningTokenSum, equals(150));
+
+          // Elapse another 35 seconds (total 65s since first request)
+          async.elapse(const Duration(seconds: 35));
+          limiter.throttleBeforeRequest(25);
+
+          // First request (65s ago) should be pruned; second (35s ago) and third (0s ago) remain
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.tokenUsage.length, equals(2));
+          expect(limiter.requestTimestamps.contains(oldTimestamp), isFalse);
+          expect(limiter.runningTokenSum, equals(75)); // 50 + 25, 100 pruned
+        });
+      },
+    );
+
+    test(
+      'RateLimiter with negative throttlePercentage prunes expired history and decrements runningTokenSum',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-negative-throttle-prune-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10,
+            limitRpm: 120,
+            limitTpm: 100,
+            description: 'Test negative throttle pruning',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: -10.0,
+            nowProvider: () => clock.now(),
+          );
+
+          final oldTimestamp = clock.now();
+          limiter.throttleBeforeRequest(80);
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(80));
+
+          // Advance past 1 minute window
+          async.elapse(const Duration(seconds: 61));
+          limiter.throttleBeforeRequest(30);
+
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.requestTimestamps.contains(oldTimestamp), isFalse);
+          expect(limiter.runningTokenSum, equals(30));
+        });
+      },
+    );
+
+    test(
       'RateLimiter handles estimatedTokens exceeding TPM limit without infinite loop or crash',
       () {
         fakeAsync((async) {
