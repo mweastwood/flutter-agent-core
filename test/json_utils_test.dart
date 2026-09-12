@@ -98,6 +98,42 @@ void main() {
       expect(stripMarkdownCodeFences(''), equals(''));
       expect(stripMarkdownCodeFences('   \n  \t '), equals(''));
     });
+
+    test('handles fenced multi-line with empty or whitespace-only content', () {
+      expect(stripMarkdownCodeFences('```json\n```'), equals(''));
+      expect(stripMarkdownCodeFences('```\n\n```'), equals(''));
+      expect(stripMarkdownCodeFences('```json\n   \n```'), equals(''));
+    });
+
+    test('handles two-line payload where first line is opening fence', () {
+      const input = '```json\n{"single": "line"}';
+      expect(stripMarkdownCodeFences(input), equals('{"single": "line"}'));
+    });
+
+    test(
+      'strips inline trailing fence directly attached to content on last line',
+      () {
+        const input = '```json\n{"action": "done"}```';
+        expect(stripMarkdownCodeFences(input), equals('{"action": "done"}'));
+      },
+    );
+
+    test('preserves code fences embedded inside string literals', () {
+      const input = '```json\n{"code": "```print(123)```"}\n```';
+      expect(
+        stripMarkdownCodeFences(input),
+        equals('{"code": "```print(123)```"}'),
+      );
+    });
+
+    test('handles large multi-line JSON payload correctly', () {
+      final entries = List.generate(500, (i) => '  "key_$i": $i');
+      final body = '{\n${entries.join(',\n')}\n}';
+      final input = '```json\n$body\n```';
+      expect(stripMarkdownCodeFences(input), equals(body));
+      expect(tryParseJsonMap(input), isNotNull);
+      expect(tryParseJsonMap(input)!['key_250'], equals(250));
+    });
   });
 
   group('parseJsonWithFenceFallback Tests', () {
