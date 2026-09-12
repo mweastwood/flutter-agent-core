@@ -2088,6 +2088,90 @@ void main() {
         expect(mockClient.isClosed, isFalse);
       },
     );
+
+    test(
+      'serializes max_tokens in request payload when maxOutputTokens is provided',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          final bodyString = await request.finalize().bytesToString();
+          final bodyData = jsonDecode(bodyString) as Map<String, dynamic>;
+          expect(bodyData['max_tokens'], equals(256));
+
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final response = await service.generateContentRaw(
+          prompt: 'test prompt',
+          maxOutputTokens: 256,
+        );
+        expect(response, isNotNull);
+        expect(response!.text, equals('ok'));
+      },
+    );
+
+    test(
+      'omits max_tokens from request payload when maxOutputTokens is null or omitted',
+      () async {
+        int callCount = 0;
+        final mockClient = MockHttpClient((request) async {
+          callCount++;
+          final bodyString = await request.finalize().bytesToString();
+          final bodyData = jsonDecode(bodyString) as Map<String, dynamic>;
+          expect(bodyData.containsKey('max_tokens'), isFalse);
+
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'ok'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final resNull = await service.generateContentRaw(
+          prompt: 'test prompt',
+          maxOutputTokens: null,
+        );
+        expect(resNull, isNotNull);
+        expect(resNull!.text, equals('ok'));
+
+        final resOmitted = await service.generateContentRaw(
+          prompt: 'test prompt',
+        );
+        expect(resOmitted, isNotNull);
+        expect(resOmitted!.text, equals('ok'));
+
+        expect(callCount, equals(2));
+      },
+    );
   });
 
   group('Heuristic & Chunk Cleaning Tests', () {
