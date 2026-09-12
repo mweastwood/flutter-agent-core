@@ -947,7 +947,9 @@ void main() {
                 }
                 return 'Success on attempt 3';
               });
-          final service = MethodChannelAiService();
+          final service = MethodChannelAiService(
+            initialRetryDelay: Duration.zero,
+          );
           final response = await service.generateContentRaw(
             prompt: 'test prompt',
           );
@@ -971,7 +973,9 @@ void main() {
                   message: 'Failed "attempt"',
                 );
               });
-          final service = MethodChannelAiService();
+          final service = MethodChannelAiService(
+            initialRetryDelay: Duration.zero,
+          );
           final response = await service.generateContentRaw(
             prompt: 'test prompt',
           );
