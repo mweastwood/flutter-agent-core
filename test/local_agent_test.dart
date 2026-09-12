@@ -960,6 +960,58 @@ void main() {
       );
 
       test(
+        'clears stale lastError and returns null when retry succeeds with null result',
+        () async {
+          int attempts = 0;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                attempts++;
+                if (attempts == 1) {
+                  throw PlatformException(
+                    code: 'TEMPORARY_ERROR',
+                    message: 'Initial failure',
+                  );
+                }
+                return null;
+              });
+          final service = MethodChannelAiService(
+            initialRetryDelay: Duration.zero,
+          );
+          final response = await service.generateContentRaw(
+            prompt: 'test prompt',
+          );
+
+          expect(attempts, equals(2));
+          expect(response, isNull);
+        },
+      );
+
+      test(
+        'generateContent returns null when retry succeeds with null result after earlier failure',
+        () async {
+          int attempts = 0;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+                attempts++;
+                if (attempts == 1) {
+                  throw PlatformException(
+                    code: 'TEMPORARY_ERROR',
+                    message: 'Initial failure',
+                  );
+                }
+                return null;
+              });
+          final service = MethodChannelAiService(
+            initialRetryDelay: Duration.zero,
+          );
+          final text = await service.generateContent(prompt: 'test prompt');
+
+          expect(attempts, equals(2));
+          expect(text, isNull);
+        },
+      );
+
+      test(
         'returns error JSON with isError true when all 4 attempts fail',
         () async {
           int attempts = 0;

@@ -108,6 +108,8 @@ class MethodChannelAiService extends AiService {
             'temperature': temperature,
             'maxOutputTokens': maxOutputTokens,
           });
+          lastError = null;
+          lastStackTrace = null;
           break; // Success! Exit the retry loop.
         } catch (e, stack) {
           lastError = e;
