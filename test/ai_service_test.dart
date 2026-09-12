@@ -432,27 +432,30 @@ void main() {
       expect(backoff1, equals(backoff2));
     });
 
-    test('produces symmetric jitter range reaching both -jitterRange and +jitterRange', () {
-      // 1000ms delay yields jitterRange = 250ms (+/-25%)
-      // Range of rnd.nextInt(jitterRange * 2 + 1) is 0 to 500
-      final minBackoff = AiService.calculateExponentialBackoff(
-        attempt: 1,
-        initialRetryDelay: const Duration(milliseconds: 1000),
-        maxRetryDelay: const Duration(seconds: 15),
-        enableJitter: true,
-        random: _FixedRandom(0),
-      );
-      final maxBackoff = AiService.calculateExponentialBackoff(
-        attempt: 1,
-        initialRetryDelay: const Duration(milliseconds: 1000),
-        maxRetryDelay: const Duration(seconds: 15),
-        enableJitter: true,
-        random: _FixedRandom(500),
-      );
+    test(
+      'produces symmetric jitter range reaching both -jitterRange and +jitterRange',
+      () {
+        // 1000ms delay yields jitterRange = 250ms (+/-25%)
+        // Range of rnd.nextInt(jitterRange * 2 + 1) is 0 to 500
+        final minBackoff = AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 1000),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: true,
+          random: _FixedRandom(0),
+        );
+        final maxBackoff = AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 1000),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: true,
+          random: _FixedRandom(500),
+        );
 
-      expect(minBackoff, equals(const Duration(milliseconds: 750)));
-      expect(maxBackoff, equals(const Duration(milliseconds: 1250)));
-    });
+        expect(minBackoff, equals(const Duration(milliseconds: 750)));
+        expect(maxBackoff, equals(const Duration(milliseconds: 1250)));
+      },
+    );
   });
 
   group('AiServiceJsonExtension.generateJson Tests', () {

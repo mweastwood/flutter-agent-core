@@ -1180,7 +1180,6 @@ void main() {
     });
   });
 
-
   group('MockAiService Tests', () {
     test('triggerDownload transitions status with custom delay parameter', () {
       fakeAsync((async) {
