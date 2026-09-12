@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
 import 'package:flutter_agent_core/src/ai_service_web.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -123,16 +124,23 @@ void main() {
         expect(client.triggerDownloadCallCount, equals(1));
       });
 
-      test('respects optional delay parameter', () async {
-        final client = TestChromeAiClient();
-        final service = WebAiService(client: client);
+      test('respects optional delay parameter', () {
+        fakeAsync((async) {
+          final client = TestChromeAiClient();
+          final service = WebAiService(client: client);
 
-        final stopwatch = Stopwatch()..start();
-        await service.triggerDownload(delay: const Duration(milliseconds: 50));
-        stopwatch.stop();
+          service.triggerDownload(delay: const Duration(milliseconds: 50));
+          expect(client.triggerDownloadCalled, isFalse);
+          expect(client.triggerDownloadCallCount, equals(0));
 
-        expect(client.triggerDownloadCalled, isTrue);
-        expect(stopwatch.elapsedMilliseconds, greaterThanOrEqualTo(40));
+          async.elapse(const Duration(milliseconds: 49));
+          expect(client.triggerDownloadCalled, isFalse);
+          expect(client.triggerDownloadCallCount, equals(0));
+
+          async.elapse(const Duration(milliseconds: 1));
+          expect(client.triggerDownloadCalled, isTrue);
+          expect(client.triggerDownloadCallCount, equals(1));
+        });
       });
 
       test(
@@ -147,14 +155,18 @@ void main() {
         },
       );
 
-      test('null client is a safe no-op with and without delay', () async {
-        final service = WebAiService(client: null);
+      test('null client is a safe no-op with and without delay', () {
+        fakeAsync((async) {
+          final service = WebAiService(client: null);
 
-        await expectLater(service.triggerDownload(), completes);
-        await expectLater(
-          service.triggerDownload(delay: const Duration(milliseconds: 10)),
-          completes,
-        );
+          expect(service.triggerDownload(), completes);
+          expect(
+            service.triggerDownload(delay: const Duration(milliseconds: 10)),
+            completes,
+          );
+          async.elapse(const Duration(milliseconds: 10));
+          async.flushMicrotasks();
+        });
       });
     });
 
