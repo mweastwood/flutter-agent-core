@@ -1682,7 +1682,10 @@ void main() {
             jsonEncode({
               'choices': [
                 {
-                  'message': {'role': 'assistant', 'content': 'after rate limit'},
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'after rate limit',
+                  },
                   'finish_reason': 'stop',
                 },
               ],
