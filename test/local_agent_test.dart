@@ -1722,42 +1722,58 @@ void main() {
       },
     );
 
-    test('honors Retry-After header on 503 or 429 response', () async {
-      int attempts = 0;
-      final mockClient = MockHttpClient((request) async {
-        attempts++;
-        if (attempts == 1) {
+    test('honors Retry-After header on 503 or 429 response', () {
+      fakeAsync((async) {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
+          if (attempts == 1) {
+            return http.Response(
+              'Rate limit exceeded',
+              429,
+              headers: {'retry-after': '1'},
+            );
+          }
           return http.Response(
-            'Rate limit exceeded',
-            429,
-            headers: {'retry-after': '1'},
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'after rate limit',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
           );
-        }
-        return http.Response(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {'role': 'assistant', 'content': 'after rate limit'},
-                'finish_reason': 'stop',
-              },
-            ],
-          }),
-          200,
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          initialRetryDelay: Duration.zero,
+          httpClient: mockClient,
         );
+
+        AiResponse? response;
+        service.generateContentRaw(prompt: 'hello world').then((res) {
+          response = res;
+        });
+
+        async.flushMicrotasks();
+        expect(attempts, equals(1));
+        expect(response, isNull);
+
+        async.elapse(const Duration(seconds: 1));
+        async.flushMicrotasks();
+
+        expect(attempts, equals(2));
+        expect(response?.text, equals('after rate limit'));
+        expect(response?.isError, isFalse);
       });
-
-      final service = CloudAiService(
-        baseUrl: 'https://api.gemini.com/v1',
-        apiKey: 'test-key',
-        modelName: 'gemini-1.5-flash',
-        initialRetryDelay: Duration.zero,
-        httpClient: mockClient,
-      );
-
-      final response = await service.generateContentRaw(prompt: 'hello world');
-      expect(attempts, equals(2));
-      expect(response?.text, equals('after rate limit'));
-      expect(response?.isError, isFalse);
     });
 
     test(
