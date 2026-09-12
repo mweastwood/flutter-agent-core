@@ -31,7 +31,7 @@ class WebChromeAiClient implements ChromeAiClient {
     }
 
     final jsStatus = await ai.checkStatus().toDart;
-    return (jsStatus as JSString).toDart;
+    return (jsStatus as JSString?)?.toDart;
   }
 
   @override
