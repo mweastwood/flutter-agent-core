@@ -90,7 +90,7 @@ abstract class AiService {
     final rnd = random ?? Random();
     final jitterRange = min(1000, (boundedMs * 0.25).round());
     final jitter = jitterRange > 0
-        ? (rnd.nextInt(jitterRange * 2) - jitterRange)
+        ? (rnd.nextInt(jitterRange * 2 + 1) - jitterRange)
         : 0;
     final finalMs = max(1, boundedMs + jitter);
     return Duration(milliseconds: finalMs);

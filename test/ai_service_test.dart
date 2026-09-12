@@ -8,6 +8,20 @@ import 'package:flutter_agent_core/src/ai_service_stub.dart'
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _FixedRandom implements Random {
+  final int valueToReturn;
+  _FixedRandom(this.valueToReturn);
+
+  @override
+  int nextInt(int max) => valueToReturn;
+
+  @override
+  bool nextBool() => throw UnimplementedError();
+
+  @override
+  double nextDouble() => throw UnimplementedError();
+}
+
 class TestFakeAiService extends AiService {
   String? mockContent;
   String? capturedPrompt;
@@ -416,6 +430,28 @@ void main() {
         random: Random(42),
       );
       expect(backoff1, equals(backoff2));
+    });
+
+    test('produces symmetric jitter range reaching both -jitterRange and +jitterRange', () {
+      // 1000ms delay yields jitterRange = 250ms (+/-25%)
+      // Range of rnd.nextInt(jitterRange * 2 + 1) is 0 to 500
+      final minBackoff = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: _FixedRandom(0),
+      );
+      final maxBackoff = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: _FixedRandom(500),
+      );
+
+      expect(minBackoff, equals(const Duration(milliseconds: 750)));
+      expect(maxBackoff, equals(const Duration(milliseconds: 1250)));
     });
   });
 
