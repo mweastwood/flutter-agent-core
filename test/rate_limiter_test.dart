@@ -115,6 +115,7 @@ void main() {
           final mockInfo = CloudModelInfo(
             modelName: 'test-prune-model',
             provider: CloudProvider.gemini,
+            limitTpm: 1000,
             description: 'Test limit',
           );
 
@@ -649,6 +650,135 @@ void main() {
             limiter.requestTimestamps.first,
             equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
           );
+        });
+      },
+    );
+
+    test(
+      'RateLimiter skips token tracking and queue allocation when limitTpm is null or non-positive',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          // Case 1: limitTpm is null (unconfigured)
+          final unconfiguredInfo = CloudModelInfo(
+            modelName: 'test-unconfigured-tpm-model',
+            provider: CloudProvider.gemini,
+            description: 'Test unconfigured TPM limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: unconfiguredInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          limiter.throttleBeforeRequest(500);
+          limiter.throttleBeforeRequest(300);
+
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.tokenUsage.isEmpty, isTrue);
+          expect(limiter.runningTokenSum, equals(0));
+
+          // Case 2: throttlePercentage <= 0.0 with limitTpm null
+          final zeroThrottleLimiter = RateLimiter(
+            modelInfo: unconfiguredInfo,
+            throttlePercentage: 0.0,
+            nowProvider: () => clock.now(),
+          );
+
+          zeroThrottleLimiter.throttleBeforeRequest(1000);
+          expect(zeroThrottleLimiter.requestTimestamps.length, equals(1));
+          expect(zeroThrottleLimiter.tokenUsage.isEmpty, isTrue);
+          expect(zeroThrottleLimiter.runningTokenSum, equals(0));
+
+          // Case 3: limitTpm is 0 or negative
+          for (final nonPositiveTpm in [0, -50]) {
+            final nonPositiveInfo = CloudModelInfo(
+              modelName: 'test-non-positive-tpm-model',
+              provider: CloudProvider.gemini,
+              limitTpm: nonPositiveTpm,
+              description: 'Test non-positive TPM limit',
+            );
+
+            final nonPosLimiter = RateLimiter(
+              modelInfo: nonPositiveInfo,
+              throttlePercentage: 100.0,
+              nowProvider: () => clock.now(),
+            );
+
+            nonPosLimiter.throttleBeforeRequest(250);
+            expect(nonPosLimiter.requestTimestamps.length, equals(1));
+            expect(nonPosLimiter.tokenUsage.isEmpty, isTrue);
+            expect(nonPosLimiter.runningTokenSum, equals(0));
+          }
+
+          // Case 4: pruneExpiredTokens is skipped when limitTpm is null
+          final pruningSkipLimiter = RateLimiter(
+            modelInfo: unconfiguredInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+          final oldTimestamp = clock.now().subtract(const Duration(minutes: 2));
+          pruningSkipLimiter.recordRequestForTesting(
+            oldTimestamp,
+            tokenCount: 999,
+          );
+          expect(pruningSkipLimiter.tokenUsage.length, equals(1));
+          expect(pruningSkipLimiter.runningTokenSum, equals(999));
+
+          pruningSkipLimiter.throttleBeforeRequest(100);
+          // Timestamp was pruned from requestTimestamps, but tokenUsage wasn't traversed/pruned
+          expect(
+            pruningSkipLimiter.requestTimestamps.contains(oldTimestamp),
+            isFalse,
+          );
+          expect(pruningSkipLimiter.tokenUsage.length, equals(1));
+          expect(pruningSkipLimiter.runningTokenSum, equals(999));
+        });
+      },
+    );
+
+    test(
+      'RateLimiter maintains normal RPS and RPM rate limiting without TPM tracking',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-rpm-rps-no-tpm-model',
+            provider: CloudProvider.gemini,
+            limitRps: 5, // 200ms interval
+            limitRpm: 2, // max 2 requests per minute
+            limitTpm: null, // no TPM limit
+            description: 'Test RPM & RPS without TPM',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // First request executes immediately
+          limiter.throttleBeforeRequest(1000);
+          expect(async.elapsed, equals(Duration.zero));
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.tokenUsage.isEmpty, isTrue);
+          expect(limiter.runningTokenSum, equals(0));
+
+          // Second request throttled by RPS (must wait 200ms)
+          limiter.throttleBeforeRequest(1000);
+          async.elapse(const Duration(milliseconds: 200));
+          expect(async.elapsed, equals(const Duration(milliseconds: 200)));
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.tokenUsage.isEmpty, isTrue);
+          expect(limiter.runningTokenSum, equals(0));
+
+          // Third request throttled by RPM limit (limit is 2 RPM, must wait for 1st to expire + 100ms buffer)
+          limiter.throttleBeforeRequest(1000);
+          async.elapse(const Duration(seconds: 60));
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(limiter.tokenUsage.isEmpty, isTrue);
+          expect(limiter.runningTokenSum, equals(0));
         });
       },
     );

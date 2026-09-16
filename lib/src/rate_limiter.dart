@@ -6,9 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'model_database.dart';
 
 class RateLimiter {
+  /// Buffer duration added to throttle wait calculations to ensure sliding window boundaries
+  /// have safely elapsed before the next check.
+  static const Duration _throttleWaitBuffer = Duration(milliseconds: 100);
+
   final double throttlePercentage;
   final CloudModelInfo modelInfo;
   final DateTime Function() _now;
+  final bool _hasTpmLimit;
 
   final Queue<DateTime> _requestTimestamps = Queue<DateTime>();
   final Queue<({DateTime timestamp, int tokenCount})> _tokenUsage =
@@ -23,7 +28,8 @@ class RateLimiter {
     required this.modelInfo,
     this.throttlePercentage = 100.0,
     DateTime Function()? nowProvider,
-  }) : _now = nowProvider ?? DateTime.now;
+  }) : _now = nowProvider ?? DateTime.now,
+       _hasTpmLimit = modelInfo.limitTpm != null && modelInfo.limitTpm! > 0;
 
   @visibleForTesting
   List<DateTime> get requestTimestamps => List.unmodifiable(_requestTimestamps);
@@ -63,12 +69,16 @@ class RateLimiter {
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
     final now = _now();
     _pruneExpiredRequests(now, const Duration(minutes: 1));
-    _pruneExpiredTokens(now, const Duration(minutes: 1));
+    if (_hasTpmLimit) {
+      _pruneExpiredTokens(now, const Duration(minutes: 1));
+    }
 
     if (throttlePercentage <= 0.0) {
       _requestTimestamps.add(now);
-      _tokenUsage.add((timestamp: now, tokenCount: estimatedTokens));
-      _runningTokenSum += estimatedTokens;
+      if (_hasTpmLimit) {
+        _tokenUsage.add((timestamp: now, tokenCount: estimatedTokens));
+        _runningTokenSum += estimatedTokens;
+      }
       return;
     }
 
@@ -107,14 +117,14 @@ class RateLimiter {
         final waitDuration =
             const Duration(minutes: 1) -
             checkTime.difference(oldestInWindow) +
-            const Duration(milliseconds: 100);
+            _throttleWaitBuffer;
         if (waitDuration > Duration.zero) {
           await Future.delayed(waitDuration);
         }
       }
     }
 
-    if (modelInfo.limitTpm != null && modelInfo.limitTpm! > 0) {
+    if (_hasTpmLimit) {
       final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
       while (true) {
         final checkTime = _now();
@@ -128,7 +138,7 @@ class RateLimiter {
         final waitDuration =
             const Duration(minutes: 1) -
             checkTime.difference(oldestInWindow.timestamp) +
-            const Duration(milliseconds: 100);
+            _throttleWaitBuffer;
         if (waitDuration > Duration.zero) {
           await Future.delayed(waitDuration);
         }
@@ -137,10 +147,12 @@ class RateLimiter {
 
     final actualRequestTime = _now();
     _requestTimestamps.add(actualRequestTime);
-    _tokenUsage.add((
-      timestamp: actualRequestTime,
-      tokenCount: estimatedTokens,
-    ));
-    _runningTokenSum += estimatedTokens;
+    if (_hasTpmLimit) {
+      _tokenUsage.add((
+        timestamp: actualRequestTime,
+        tokenCount: estimatedTokens,
+      ));
+      _runningTokenSum += estimatedTokens;
+    }
   }
 }
