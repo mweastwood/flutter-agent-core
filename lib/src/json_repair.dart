@@ -31,6 +31,15 @@ class _StackFrame {
       lastCommaPos = -1;
 }
 
+final _reJsonNumber = RegExp(r'^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$');
+
+bool _isValidJsonLiteral(String token) {
+  if (token == 'true' || token == 'false' || token == 'null') {
+    return true;
+  }
+  return _reJsonNumber.hasMatch(token);
+}
+
 /// Repairs truncated or malformed JSON output by balancing braces,
 /// completing unclosed quotes, rolling back dangling keys and colons,
 /// and stripping trailing commas.
@@ -160,8 +169,7 @@ String repairJson(String json) {
     if (char == '}') {
       while (stack.isNotEmpty && stack.last.type != _ContainerType.object) {
         final frame = stack.removeLast();
-        if (frame.arrayState == _ArrayState.expectingValue &&
-            frame.lastCommaPos != -1) {
+        if (frame.arrayState == _ArrayState.expectingValue) {
           truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write(']');
@@ -199,8 +207,7 @@ String repairJson(String json) {
 
       if (stack.isNotEmpty && stack.last.type == _ContainerType.array) {
         final frame = stack.removeLast();
-        if (frame.arrayState == _ArrayState.expectingValue &&
-            frame.lastCommaPos != -1) {
+        if (frame.arrayState == _ArrayState.expectingValue) {
           truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write(']');
@@ -214,11 +221,21 @@ String repairJson(String json) {
     }
 
     // Literals (numbers, boolean, null)
+    final tokenStart = i;
     while (i < json.length && !'{}[]:, \t\r\n"'.contains(json[i])) {
-      output.write(json[i]);
       i++;
     }
-    onValueCompleted(output.length);
+    final token = json.substring(tokenStart, i);
+    if (_isValidJsonLiteral(token)) {
+      output.write(token);
+      onValueCompleted(output.length);
+    } else {
+      if (stack.isNotEmpty) {
+        truncateTo(stack.last.lastCompleteEntryEndPos);
+      } else {
+        truncateTo(0);
+      }
+    }
   }
 
   while (stack.isNotEmpty) {
@@ -232,8 +249,7 @@ String repairJson(String json) {
         onValueCompleted(output.length);
       }
     } else {
-      if (frame.arrayState == _ArrayState.expectingValue &&
-          frame.lastCommaPos != -1) {
+      if (frame.arrayState == _ArrayState.expectingValue) {
         truncateTo(frame.lastCompleteEntryEndPos);
       }
       output.write(']');
