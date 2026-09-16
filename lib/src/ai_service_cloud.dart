@@ -11,6 +11,7 @@ import 'model_database.dart';
 import 'rate_limiter.dart';
 
 final _reNonAscii = RegExp(r'[^\x00-\x7F]');
+final _trailingSlashesRegex = RegExp(r'/+$');
 
 class CloudAiService extends AiService {
   final String baseUrl;
@@ -23,6 +24,8 @@ class CloudAiService extends AiService {
   final bool enableJitter;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
+  final Uri _endpointUri;
+  final Map<String, String> _headers;
   final RateLimiter? _rateLimiter;
   final Random? _random;
 
@@ -39,6 +42,13 @@ class CloudAiService extends AiService {
     this._random,
   }) : _httpClient = httpClient ?? http.Client(),
        _ownsHttpClient = httpClient == null,
+       _endpointUri = Uri.parse(
+         '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
+       ),
+       _headers = Map.unmodifiable({
+         'Content-Type': 'application/json',
+         'Authorization': 'Bearer ${apiKey.replaceAll(_reNonAscii, '').trim()}',
+       }),
        _rateLimiter = (() {
          final info = CloudModelDatabase.getModelInfo(modelName);
          return info != null
@@ -126,9 +136,6 @@ class CloudAiService extends AiService {
       await _rateLimiter.throttleBeforeRequest(estimatedTokens);
     }
 
-    final normalizedBaseUrl = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
-    final url = Uri.parse('$normalizedBaseUrl/chat/completions');
-
     final List<Map<String, dynamic>> messages = [];
     if (imageBytes != null && imageBytes.isNotEmpty) {
       final base64Image = base64Encode(imageBytes);
@@ -146,12 +153,6 @@ class CloudAiService extends AiService {
       messages.add({'role': 'user', 'content': prompt});
     }
 
-    final cleanApiKey = apiKey.replaceAll(_reNonAscii, '').trim();
-    final headers = {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $cleanApiKey',
-    };
-
     final body = jsonEncode({
       'model': modelName,
       'messages': messages,
@@ -168,8 +169,8 @@ class CloudAiService extends AiService {
     for (int attempt = 1; attempt <= totalAttempts; attempt++) {
       try {
         final response = await _httpClient.post(
-          url,
-          headers: headers,
+          _endpointUri,
+          headers: _headers,
           body: body,
         );
 
