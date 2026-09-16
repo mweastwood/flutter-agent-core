@@ -2257,6 +2257,8 @@ void main() {
       // Incomplete JSON array/object
       expect(isTruncatedHeuristic('[1, 2', false), isTrue);
       expect(isTruncatedHeuristic('{"foo": "bar"', false), isTrue);
+      expect(isTruncatedHeuristic('[{"a": 1}', false), isTrue);
+      expect(isTruncatedHeuristic('{"items": [1, 2]', false), isTrue);
 
       // Complete JSON array/object
       expect(isTruncatedHeuristic('[1, 2]', false), isFalse);

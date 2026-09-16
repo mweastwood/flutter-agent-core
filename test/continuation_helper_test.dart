@@ -368,6 +368,32 @@ void main() {
       );
     });
 
+    test(
+      'isTruncatedHeuristic detects mismatched root JSON structural delimiters',
+      () {
+        // Mismatched delimiters (truncated)
+        expect(isTruncatedHeuristic('[{"a": 1}', false), isTrue);
+        expect(isTruncatedHeuristic('{"items": [1, 2]', false), isTrue);
+        expect(isTruncatedHeuristic('[{"a": 1}, {"b": 2}', false), isTrue);
+        expect(
+          isTruncatedHeuristic('{"data": {"nested": [1, 2]', false),
+          isTrue,
+        );
+        expect(isTruncatedHeuristic('  [{"a": 1}  ', false), isTrue);
+        expect(isTruncatedHeuristic('  {"items": [1, 2]  ', false), isTrue);
+
+        // Matching delimiters (non-truncated / closed root)
+        expect(isTruncatedHeuristic('[{"a": 1}]', false), isFalse);
+        expect(isTruncatedHeuristic('{"items": [1, 2]}', false), isFalse);
+        expect(isTruncatedHeuristic('[]', false), isFalse);
+        expect(isTruncatedHeuristic('{}', false), isFalse);
+
+        // Single unmatched characters
+        expect(isTruncatedHeuristic('[', false), isTrue);
+        expect(isTruncatedHeuristic('{', false), isTrue);
+      },
+    );
+
     test('cleanContinuationChunk strips fences and headers', () {
       expect(
         cleanContinuationChunk('```json\n{"val": 1}\n```'),

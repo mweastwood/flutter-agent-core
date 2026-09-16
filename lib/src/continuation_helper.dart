@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'ai_service.dart';
 import 'json_utils.dart';
 
-final _reTruncatedTerminator = RegExp(r'[.!?}]');
+final _reTruncatedTerminator = RegExp(r'[.!?}\]]');
 final _reTruncatedContinue = RegExp(r'[a-zA-Z0-9,"-]');
 final _reLeadingNewlines = RegExp(r'^\r?\n+');
 final _reTrailingNewlines = RegExp(r'\r?\n+$');
@@ -26,13 +26,12 @@ bool isTruncatedHeuristic(String text, bool nativeIsTruncated) {
   final trimmed = text.trim();
   if (trimmed.isEmpty) return false;
 
-  // JSON heuristic: starts with JSON structural character but does not end with one
-  final startsWithJson = trimmed.startsWith('[') || trimmed.startsWith('{');
-  if (startsWithJson) {
-    final endsWithJson = trimmed.endsWith(']') || trimmed.endsWith('}');
-    if (!endsWithJson) {
-      return true;
-    }
+  // JSON heuristic: starts with JSON structural character but does not end with matching delimiter
+  if (trimmed.startsWith('{') && !trimmed.endsWith('}')) {
+    return true;
+  }
+  if (trimmed.startsWith('[') && !trimmed.endsWith(']')) {
+    return true;
   }
 
   // Code fence heuristic: starts with opening code fence but not closed at the end
