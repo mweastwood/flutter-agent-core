@@ -139,5 +139,99 @@ void main() {
       const valid = '{"key": "value", "list": [1, 2, 3]}';
       expect(direct.repairJson(valid), equals(valid));
     });
+
+    test('handles truncated incomplete literals (booleans, null, numbers)', () {
+      // Object context
+      final objTru = direct.repairJson('{"a": 1, "b": tru');
+      expect(objTru, equals('{"a": 1}'));
+      expect(jsonDecode(objTru), equals({'a': 1}));
+
+      final objFal = direct.repairJson('{"a": 1, "b": fal');
+      expect(objFal, equals('{"a": 1}'));
+      expect(jsonDecode(objFal), equals({'a': 1}));
+
+      final objNul = direct.repairJson('{"a": 1, "b": nul');
+      expect(objNul, equals('{"a": 1}'));
+      expect(jsonDecode(objNul), equals({'a': 1}));
+
+      final objDot = direct.repairJson('{"a": 1, "b": 12.');
+      expect(objDot, equals('{"a": 1}'));
+      expect(jsonDecode(objDot), equals({'a': 1}));
+
+      final objMinus = direct.repairJson('{"a": 1, "b": -');
+      expect(objMinus, equals('{"a": 1}'));
+      expect(jsonDecode(objMinus), equals({'a': 1}));
+
+      final objExp = direct.repairJson('{"a": 1, "b": 1e');
+      expect(objExp, equals('{"a": 1}'));
+      expect(jsonDecode(objExp), equals({'a': 1}));
+
+      final objSingleKey = direct.repairJson('{"key": tru');
+      expect(objSingleKey, equals('{}'));
+      expect(jsonDecode(objSingleKey), equals(<String, dynamic>{}));
+
+      // Array context
+      final arrTru = direct.repairJson('[1, 2, tru');
+      expect(arrTru, equals('[1, 2]'));
+      expect(jsonDecode(arrTru), equals([1, 2]));
+
+      final arrFal = direct.repairJson('[1, 2, fal');
+      expect(arrFal, equals('[1, 2]'));
+      expect(jsonDecode(arrFal), equals([1, 2]));
+
+      final arrNul = direct.repairJson('[1, 2, nul');
+      expect(arrNul, equals('[1, 2]'));
+      expect(jsonDecode(arrNul), equals([1, 2]));
+
+      final arrDot = direct.repairJson('[1, 2, 12.');
+      expect(arrDot, equals('[1, 2]'));
+      expect(jsonDecode(arrDot), equals([1, 2]));
+
+      final arrMinus = direct.repairJson('[1, 2, -');
+      expect(arrMinus, equals('[1, 2]'));
+      expect(jsonDecode(arrMinus), equals([1, 2]));
+
+      final arrExp = direct.repairJson('[1, 2, 1e');
+      expect(arrExp, equals('[1, 2]'));
+      expect(jsonDecode(arrExp), equals([1, 2]));
+
+      final arrSingleTru = direct.repairJson('[tru');
+      expect(arrSingleTru, equals('[]'));
+      expect(jsonDecode(arrSingleTru), equals([]));
+
+      // Valid literals remain intact
+      final validTrue = direct.repairJson('{"a": 1, "b": true');
+      expect(validTrue, equals('{"a": 1, "b": true}'));
+      expect(jsonDecode(validTrue), equals({'a': 1, 'b': true}));
+
+      final validFalse = direct.repairJson('{"a": 1, "b": false');
+      expect(validFalse, equals('{"a": 1, "b": false}'));
+      expect(jsonDecode(validFalse), equals({'a': 1, 'b': false}));
+
+      final validNull = direct.repairJson('{"a": 1, "b": null');
+      expect(validNull, equals('{"a": 1, "b": null}'));
+      expect(jsonDecode(validNull), equals({'a': 1, 'b': null}));
+
+      final validFloat = direct.repairJson('{"a": 1, "b": 12.34');
+      expect(validFloat, equals('{"a": 1, "b": 12.34}'));
+      expect(jsonDecode(validFloat), equals({'a': 1, 'b': 12.34}));
+
+      final validNegative = direct.repairJson('{"a": 1, "b": -42');
+      expect(validNegative, equals('{"a": 1, "b": -42}'));
+      expect(jsonDecode(validNegative), equals({'a': 1, 'b': -42}));
+
+      // Incomplete literals followed by closing delimiter
+      final closedObjTru = direct.repairJson('{"a": 1, "b": tru}');
+      expect(closedObjTru, equals('{"a": 1}'));
+      expect(jsonDecode(closedObjTru), equals({'a': 1}));
+
+      final closedArrTru = direct.repairJson('[1, 2, tru]');
+      expect(closedArrTru, equals('[1, 2]'));
+      expect(jsonDecode(closedArrTru), equals([1, 2]));
+
+      final closedArrSingleTru = direct.repairJson('[tru]');
+      expect(closedArrSingleTru, equals('[]'));
+      expect(jsonDecode(closedArrSingleTru), equals([]));
+    });
   });
 }
