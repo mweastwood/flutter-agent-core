@@ -2131,15 +2131,27 @@ void main() {
 
     test(
       'dispose closes internal httpClient when client is not provided externally',
-      () {
+      () async {
         final service = CloudAiService(
           baseUrl: 'https://api.example.com',
           apiKey: 'test-key',
           modelName: 'gemini-1.5-flash',
+          maxRetries: 0,
         );
 
+        service.dispose();
         expect(() => service.dispose(), returnsNormally);
-        expect(() => service.dispose(), returnsNormally);
+
+        final res = await service.generateContentRaw(prompt: 'test');
+        expect(res, isNotNull);
+        expect(res!.isError, isTrue);
+        expect(
+          res.text,
+          anyOf(
+            contains('Cannot access a closed Client'),
+            contains('Client is already closed'),
+          ),
+        );
       },
     );
 
