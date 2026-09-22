@@ -72,11 +72,11 @@ class RateLimiter {
     final currentCompleter = Completer<void>();
     _lockFuture = currentCompleter.future;
 
-    if (previousLock != null) {
-      await previousLock;
-    }
-
     try {
+      if (previousLock != null) {
+        await previousLock;
+      }
+
       final now = _now();
       _pruneExpiredRequests(now, const Duration(minutes: 1));
       if (_hasTpmLimit) {

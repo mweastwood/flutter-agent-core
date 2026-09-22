@@ -809,9 +809,9 @@ void main() {
           async.elapse(const Duration(milliseconds: 50));
 
           // Now launch 3 concurrent requests at t = 50ms
-          final req1 = limiter.throttleBeforeRequest(10);
-          final req2 = limiter.throttleBeforeRequest(10);
-          final req3 = limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
 
           // Advance 50ms -> req1 should execute at t = 100ms
           async.elapse(const Duration(milliseconds: 50));
