@@ -782,5 +782,68 @@ void main() {
         });
       },
     );
+
+    test(
+      'RateLimiter prevents concurrency race condition in throttleBeforeRequest by serializing RPS limits for concurrent requests',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-rps-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10, // 10 RPS -> 100ms interval
+            description: 'Test concurrent limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire initial request at t = 0ms
+          limiter.throttleBeforeRequest(10);
+          expect(limiter.requestTimestamps.length, equals(1));
+
+          // Elapse 50ms (within the 100ms interval)
+          async.elapse(const Duration(milliseconds: 50));
+
+          // Now launch 3 concurrent requests at t = 50ms
+          final req1 = limiter.throttleBeforeRequest(10);
+          final req2 = limiter.throttleBeforeRequest(10);
+          final req3 = limiter.throttleBeforeRequest(10);
+
+          // Advance 50ms -> req1 should execute at t = 100ms
+          async.elapse(const Duration(milliseconds: 50));
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(
+            limiter.requestTimestamps[1].difference(
+              limiter.requestTimestamps[0],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+
+          // Advance another 100ms -> req2 should execute at t = 200ms
+          async.elapse(const Duration(milliseconds: 100));
+          expect(limiter.requestTimestamps.length, equals(3));
+          expect(
+            limiter.requestTimestamps[2].difference(
+              limiter.requestTimestamps[1],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+
+          // Advance another 100ms -> req3 should execute at t = 300ms
+          async.elapse(const Duration(milliseconds: 100));
+          expect(limiter.requestTimestamps.length, equals(4));
+          expect(
+            limiter.requestTimestamps[3].difference(
+              limiter.requestTimestamps[2],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+        });
+      },
+    );
   });
 }
