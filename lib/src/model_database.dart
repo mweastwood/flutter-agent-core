@@ -13,8 +13,7 @@ class CloudModelDatabase {
   ];
 
   static final Map<String, CloudModelInfo> _modelsMap = {
-    for (final model in allModels)
-      model.modelName: model,
+    for (final model in allModels) model.modelName: model,
   };
 
   /// Query which models are available, optionally filtering by provider and vision support.
