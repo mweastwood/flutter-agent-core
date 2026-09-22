@@ -7,6 +7,7 @@ import 'models/zhipu_models.dart';
 class CloudModelDatabase {
   static const List<CloudModelInfo> geminiModels = kGeminiModels;
   static const List<CloudModelInfo> zhipuModels = kZhipuModels;
+  /// Combined list of all supported cloud models across all providers.
   static const List<CloudModelInfo> allModels = [
     ...geminiModels,
     ...zhipuModels,
