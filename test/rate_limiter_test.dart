@@ -845,5 +845,97 @@ void main() {
         });
       },
     );
+
+    test(
+      'RateLimiter serializes concurrent requests under Requests-Per-Minute (RPM) limits',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-rpm-model',
+            provider: CloudProvider.gemini,
+            limitRpm: 2, // 2 RPM limit
+            description: 'Test concurrent RPM limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire 2 initial requests at t = 0 (filling the 2 RPM capacity)
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+          expect(limiter.requestTimestamps.length, equals(2));
+
+          // Elapse 10 seconds
+          async.elapse(const Duration(seconds: 10));
+
+          // Launch 2 concurrent requests at t = 10s
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+
+          // Both requests should be waiting since 2 requests are active in 1-minute window
+          expect(limiter.requestTimestamps.length, equals(2));
+
+          // Elapse to 60s + 100ms buffer from start (50.1s from t = 10s)
+          // Oldest requests at t = 0s expire and get pruned from sliding window,
+          // while the two queued requests execute at t = 60.1s.
+          async.elapse(const Duration(milliseconds: 50100));
+          async.flushMicrotasks();
+
+          // Queue now contains the 2 new request timestamps executed at t = 60.1s
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(
+            limiter.requestTimestamps.every(
+              (ts) => ts == DateTime(2026, 1, 1, 0, 1, 0, 100),
+            ),
+            isTrue,
+          );
+        });
+      },
+    );
+
+    test(
+      'RateLimiter handles lock exception resilience without failing subsequent queued requests',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-lock-resilience-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10,
+            description: 'Test lock exception resilience',
+          );
+
+          var shouldThrow = false;
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () {
+              if (shouldThrow) {
+                throw StateError('Simulated lock error');
+              }
+              return clock.now();
+            },
+          );
+
+          // Trigger first request which throws an exception during throttle processing
+          shouldThrow = true;
+          final f1 = limiter.throttleBeforeRequest(10);
+          expect(f1, throwsA(isA<StateError>()));
+          async.flushMicrotasks();
+
+          // Reset throw flag
+          shouldThrow = false;
+
+          // Second request queued after the failed request should complete successfully
+          limiter.throttleBeforeRequest(10);
+          async.flushMicrotasks();
+          expect(limiter.requestTimestamps.length, equals(1));
+        });
+      },
+    );
   });
 }

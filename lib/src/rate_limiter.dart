@@ -74,7 +74,9 @@ class RateLimiter {
 
     try {
       if (previousLock != null) {
-        await previousLock;
+        try {
+          await previousLock;
+        } catch (_) {}
       }
 
       final now = _now();
