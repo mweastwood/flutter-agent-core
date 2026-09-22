@@ -1423,6 +1423,29 @@ void main() {
     );
   });
 
+class TestCountingCloudAiService extends CloudAiService {
+  int countTokensCallCount = 0;
+  final List<String> countedPrompts = [];
+
+  TestCountingCloudAiService({
+    required super.baseUrl,
+    required super.apiKey,
+    required super.modelName,
+    super.httpClient,
+    super.throttlePercentage,
+  });
+
+  @override
+  Future<int> countTokens({
+    required String prompt,
+    Uint8List? imageBytes,
+  }) async {
+    countTokensCallCount++;
+    countedPrompts.add(prompt);
+    return super.countTokens(prompt: prompt, imageBytes: imageBytes);
+  }
+}
+
   group('CloudAiService Tests', () {
     test(
       'sends request and parses OpenAI-compatible response correctly',
@@ -2254,6 +2277,83 @@ void main() {
         expect(resOmitted!.text, equals('ok'));
 
         expect(callCount, equals(2));
+      },
+    );
+
+    test(
+      'reuses pre-computed estimatedPromptTokens when API response usage is missing prompt_tokens',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'AI text response'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = TestCountingCloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          httpClient: mockClient,
+        );
+
+        final promptText = 'Hello world prompt estimation test';
+        final res = await service.generateContentRaw(prompt: promptText);
+
+        expect(res, isNotNull);
+        expect(res!.text, equals('AI text response'));
+        expect(res.inputTokens, isNotNull);
+
+        // countTokens should be called once for prompt (rate-limit check) and once for output text
+        expect(service.countedPrompts.length, equals(2));
+        expect(service.countedPrompts[0], equals(promptText));
+        expect(service.countedPrompts[1], equals('AI text response'));
+      },
+    );
+
+    test(
+      'computes prompt countTokens when rate limiter is null and API response usage is missing prompt_tokens',
+      () async {
+        final mockClient = MockHttpClient((request) async {
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {'role': 'assistant', 'content': 'AI text response'},
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        // Unknown model name has no RateLimiter in CloudModelDatabase
+        final service = TestCountingCloudAiService(
+          baseUrl: 'https://api.example.com',
+          apiKey: 'test-key',
+          modelName: 'unknown-custom-model-no-rate-limit',
+          httpClient: mockClient,
+        );
+
+        final promptText = 'Hello world prompt without rate limiter';
+        final res = await service.generateContentRaw(prompt: promptText);
+
+        expect(res, isNotNull);
+        expect(res!.text, equals('AI text response'));
+        expect(res.inputTokens, isNotNull);
+
+        // countTokens should be called once for prompt (fallback in response parsing) and once for output text
+        expect(service.countedPrompts.length, equals(2));
+        expect(service.countedPrompts[0], equals(promptText));
+        expect(service.countedPrompts[1], equals('AI text response'));
       },
     );
   });

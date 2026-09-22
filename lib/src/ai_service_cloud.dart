@@ -128,12 +128,13 @@ class CloudAiService extends AiService {
     double temperature = 1.0,
     int? maxOutputTokens,
   }) async {
+    int? estimatedPromptTokens;
     if (_rateLimiter != null) {
-      final estimatedTokens = await countTokens(
+      estimatedPromptTokens = await countTokens(
         prompt: prompt,
         imageBytes: imageBytes,
       );
-      await _rateLimiter.throttleBeforeRequest(estimatedTokens);
+      await _rateLimiter.throttleBeforeRequest(estimatedPromptTokens);
     }
 
     final List<Map<String, dynamic>> messages = [];
@@ -255,10 +256,11 @@ class CloudAiService extends AiService {
       int? totalTokens = usage?['total_tokens'] as int?;
 
       if (text != null) {
-        inputTokens ??= await countTokens(
-          prompt: prompt,
-          imageBytes: imageBytes,
-        );
+        inputTokens ??= estimatedPromptTokens ??
+            await countTokens(
+              prompt: prompt,
+              imageBytes: imageBytes,
+            );
         outputTokens ??= await countTokens(prompt: text);
         totalTokens ??= inputTokens + outputTokens;
       }
