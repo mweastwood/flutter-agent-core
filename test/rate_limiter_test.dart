@@ -898,6 +898,76 @@ void main() {
     );
 
     test(
+      'RateLimiter serializes concurrent requests under Tokens-Per-Minute (TPM) limits',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-tpm-model',
+            provider: CloudProvider.gemini,
+            limitTpm: 500, // 500 TPM limit
+            description: 'Test concurrent TPM limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire initial request consuming 400 tokens at t = 0s
+          limiter.throttleBeforeRequest(400);
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(400));
+
+          // Elapse 10 seconds
+          async.elapse(const Duration(seconds: 10));
+
+          // Launch 3 concurrent requests at t = 10s consuming 200 tokens each.
+          // Remaining TPM capacity is 100 (500 - 400), so all 3 requests exceed capacity
+          // and must be serialized, waiting for the t = 0s request to expire at t = 60.1s.
+          limiter.throttleBeforeRequest(200);
+          limiter.throttleBeforeRequest(200);
+          limiter.throttleBeforeRequest(200);
+
+          // All 3 requests should be waiting at t = 10s
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(400));
+
+          // Advance to t = 60.1s (50.1s elapsed)
+          // The t = 0s request (400 tokens) expires and is pruned.
+          // Req 1 processes sequentially under lock, consumes 200 tokens (sum = 200 <= 500).
+          // Req 2 processes sequentially under lock, consumes 200 tokens (sum = 400 <= 500).
+          // Req 3 processes sequentially under lock, needs 200 tokens (sum = 600 > 500), so it must wait.
+          async.elapse(const Duration(milliseconds: 50100));
+          async.flushMicrotasks();
+
+          expect(limiter.tokenUsage.length, equals(2));
+          expect(limiter.runningTokenSum, equals(400));
+          expect(
+            limiter.tokenUsage.every(
+              (item) => item.timestamp == DateTime(2026, 1, 1, 0, 1, 0, 100),
+            ),
+            isTrue,
+          );
+
+          // Advance to t = 120.2s (60.1s elapsed from t = 60.1s)
+          // Req 1 and Req 2 (total 400 tokens from t = 60.1s) expire and get pruned.
+          // Req 3 processes, consuming 200 tokens (sum = 200 <= 500).
+          async.elapse(const Duration(milliseconds: 60100));
+          async.flushMicrotasks();
+
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(200));
+          expect(
+            limiter.tokenUsage.single.timestamp,
+            equals(DateTime(2026, 1, 1, 0, 2, 0, 200)),
+          );
+        });
+      },
+    );
+
+    test(
       'RateLimiter handles lock exception resilience without failing subsequent queued requests',
       () {
         fakeAsync((async) {
