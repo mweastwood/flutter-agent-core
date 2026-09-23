@@ -8,6 +8,10 @@ void main() {
     test('static model lists match provider constants', () {
       expect(CloudModelDatabase.geminiModels, equals(kGeminiModels));
       expect(CloudModelDatabase.zhipuModels, equals(kZhipuModels));
+      expect(
+        CloudModelDatabase.allModels,
+        equals([...kGeminiModels, ...kZhipuModels]),
+      );
       expect(kGeminiModels, isNotEmpty);
       expect(kZhipuModels, isNotEmpty);
     });

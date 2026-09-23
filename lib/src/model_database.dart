@@ -8,9 +8,14 @@ class CloudModelDatabase {
   static const List<CloudModelInfo> geminiModels = kGeminiModels;
   static const List<CloudModelInfo> zhipuModels = kZhipuModels;
 
+  /// Combined list of all supported cloud models across all providers.
+  static const List<CloudModelInfo> allModels = [
+    ...geminiModels,
+    ...zhipuModels,
+  ];
+
   static final Map<String, CloudModelInfo> _modelsMap = {
-    for (final model in [...geminiModels, ...zhipuModels])
-      model.modelName: model,
+    for (final model in allModels) model.modelName: model,
   };
 
   /// Query which models are available, optionally filtering by provider and vision support.
@@ -24,7 +29,7 @@ class CloudModelDatabase {
     } else if (provider == CloudProvider.zhipu) {
       list = zhipuModels;
     } else {
-      list = [...geminiModels, ...zhipuModels];
+      list = allModels;
     }
     if (isVision != null) {
       list = list.where((m) => m.isVision == isVision);
