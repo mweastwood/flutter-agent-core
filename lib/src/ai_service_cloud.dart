@@ -39,9 +39,10 @@ class CloudAiService extends AiService {
     this.maxRetryDelay = const Duration(seconds: 15),
     this.enableJitter = true,
     http.Client? httpClient,
-    this._random,
+    Random? random,
   }) : _httpClient = httpClient ?? http.Client(),
        _ownsHttpClient = httpClient == null,
+       _random = random,
        _endpointUri = Uri.parse(
          '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
        ),
@@ -158,7 +159,7 @@ class CloudAiService extends AiService {
       'model': modelName,
       'messages': messages,
       'temperature': temperature,
-      'max_tokens': ?maxOutputTokens,
+      if (maxOutputTokens != null) 'max_tokens': maxOutputTokens,
     });
 
     dynamic lastError;

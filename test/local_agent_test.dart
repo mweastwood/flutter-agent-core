@@ -164,6 +164,29 @@ class ThrowingAgentDelegate extends MockTextAgentDelegate {
   }
 }
 
+class TestCountingCloudAiService extends CloudAiService {
+  int countTokensCallCount = 0;
+  final List<String> countedPrompts = [];
+
+  TestCountingCloudAiService({
+    required super.baseUrl,
+    required super.apiKey,
+    required super.modelName,
+    super.httpClient,
+    super.throttlePercentage,
+  });
+
+  @override
+  Future<int> countTokens({
+    required String prompt,
+    Uint8List? imageBytes,
+  }) async {
+    countTokensCallCount++;
+    countedPrompts.add(prompt);
+    return super.countTokens(prompt: prompt, imageBytes: imageBytes);
+  }
+}
+
 void main() {
   group('AgentHarness Generic ReAct Loop Tests', () {
     test('harness executes generic steps and updates environment', () async {
@@ -1422,29 +1445,6 @@ void main() {
       },
     );
   });
-
-class TestCountingCloudAiService extends CloudAiService {
-  int countTokensCallCount = 0;
-  final List<String> countedPrompts = [];
-
-  TestCountingCloudAiService({
-    required super.baseUrl,
-    required super.apiKey,
-    required super.modelName,
-    super.httpClient,
-    super.throttlePercentage,
-  });
-
-  @override
-  Future<int> countTokens({
-    required String prompt,
-    Uint8List? imageBytes,
-  }) async {
-    countTokensCallCount++;
-    countedPrompts.add(prompt);
-    return super.countTokens(prompt: prompt, imageBytes: imageBytes);
-  }
-}
 
   group('CloudAiService Tests', () {
     test(
