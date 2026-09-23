@@ -9,12 +9,11 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('json_repair Decoupling & Export Compatibility Tests', () {
     test(
-      'repairJson function identity across direct, continuation_helper, and barrel imports',
-      () {
-        expect(direct.repairJson, equals(continuation.repairJson));
-        expect(direct.repairJson, equals(barrel.repairJson));
-      },
-    );
+        'repairJson function identity across direct, continuation_helper, and barrel imports',
+        () {
+      expect(direct.repairJson, equals(continuation.repairJson));
+      expect(direct.repairJson, equals(barrel.repairJson));
+    });
 
     test('repairJson can be invoked via direct import', () {
       const truncated = '{"key": "value", "items": [1, 2, ';
@@ -30,25 +29,24 @@ void main() {
     });
 
     test(
-      'repairJson produces identical output across direct, continuation, and barrel calls',
-      () {
-        const testCases = [
-          '{"name": "test", "active": true, ',
-          '[{"id": 1}, {"id": 2, "pending": ',
-          '{"message": "incomplete quote',
-          '{"data": [1, 2, 3, ]}',
-        ];
+        'repairJson produces identical output across direct, continuation, and barrel calls',
+        () {
+      const testCases = [
+        '{"name": "test", "active": true, ',
+        '[{"id": 1}, {"id": 2, "pending": ',
+        '{"message": "incomplete quote',
+        '{"data": [1, 2, 3, ]}',
+      ];
 
-        for (final input in testCases) {
-          final directResult = direct.repairJson(input);
-          final continuationResult = continuation.repairJson(input);
-          final barrelResult = barrel.repairJson(input);
+      for (final input in testCases) {
+        final directResult = direct.repairJson(input);
+        final continuationResult = continuation.repairJson(input);
+        final barrelResult = barrel.repairJson(input);
 
-          expect(directResult, equals(continuationResult));
-          expect(directResult, equals(barrelResult));
-        }
-      },
-    );
+        expect(directResult, equals(continuationResult));
+        expect(directResult, equals(barrelResult));
+      }
+    });
   });
 
   group('json_repair Structural Recovery Tests', () {

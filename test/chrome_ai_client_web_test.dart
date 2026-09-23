@@ -26,80 +26,73 @@ void main() {
       );
 
       test(
-        'createDefaultChromeAiClient returns a non-null WebChromeAiClient instance',
-        () {
-          final client = createDefaultChromeAiClient();
-          expect(client, isNotNull);
-          expect(client, isA<WebChromeAiClient>());
-          expect(client, isA<ChromeAiClient>());
-        },
-      );
+          'createDefaultChromeAiClient returns a non-null WebChromeAiClient instance',
+          () {
+        final client = createDefaultChromeAiClient();
+        expect(client, isNotNull);
+        expect(client, isA<WebChromeAiClient>());
+        expect(client, isA<ChromeAiClient>());
+      });
     });
 
     group('Graceful Handling of Null window.chromeAi', () {
       test(
-        'checkStatus returns null without throwing when window.chromeAi is null',
-        () async {
-          globalContext['chromeAi'] = null;
-          const client = WebChromeAiClient();
-          final status = await client.checkStatus();
-          expect(status, isNull);
-        },
-      );
+          'checkStatus returns null without throwing when window.chromeAi is null',
+          () async {
+        globalContext['chromeAi'] = null;
+        const client = WebChromeAiClient();
+        final status = await client.checkStatus();
+        expect(status, isNull);
+      });
 
       test(
-        'checkStatus returns null without throwing when window.chromeAi is undefined',
-        () async {
-          globalContext.delete('chromeAi'.toJS);
-          const client = WebChromeAiClient();
-          final status = await client.checkStatus();
-          expect(status, isNull);
-        },
-      );
+          'checkStatus returns null without throwing when window.chromeAi is undefined',
+          () async {
+        globalContext.delete('chromeAi'.toJS);
+        const client = WebChromeAiClient();
+        final status = await client.checkStatus();
+        expect(status, isNull);
+      });
 
       test(
-        'triggerDownload completes normally as a safe no-op when window.chromeAi is null',
-        () async {
-          globalContext['chromeAi'] = null;
-          const client = WebChromeAiClient();
-          await expectLater(client.triggerDownload(), completes);
-        },
-      );
+          'triggerDownload completes normally as a safe no-op when window.chromeAi is null',
+          () async {
+        globalContext['chromeAi'] = null;
+        const client = WebChromeAiClient();
+        await expectLater(client.triggerDownload(), completes);
+      });
 
       test(
-        'triggerDownload completes normally as a safe no-op when window.chromeAi is undefined',
-        () async {
-          globalContext.delete('chromeAi'.toJS);
-          const client = WebChromeAiClient();
-          await expectLater(client.triggerDownload(), completes);
-        },
-      );
+          'triggerDownload completes normally as a safe no-op when window.chromeAi is undefined',
+          () async {
+        globalContext.delete('chromeAi'.toJS);
+        const client = WebChromeAiClient();
+        await expectLater(client.triggerDownload(), completes);
+      });
 
       test(
-        'getNextStroke returns null without throwing when window.chromeAi is null',
-        () async {
-          globalContext['chromeAi'] = null;
-          const client = WebChromeAiClient();
-          final result = await client.getNextStroke(
-            'prompt',
-            'system instruction',
-          );
-          expect(result, isNull);
-        },
-      );
+          'getNextStroke returns null without throwing when window.chromeAi is null',
+          () async {
+        globalContext['chromeAi'] = null;
+        const client = WebChromeAiClient();
+        final result = await client.getNextStroke(
+          'prompt',
+          'system instruction',
+        );
+        expect(result, isNull);
+      });
 
       test(
-        'getNextStroke returns null without throwing when window.chromeAi is undefined',
-        () async {
-          globalContext.delete('chromeAi'.toJS);
-          const client = WebChromeAiClient();
-          final result = await client.getNextStroke(
-            'prompt',
-            'system instruction',
-          );
-          expect(result, isNull);
-        },
-      );
+          'getNextStroke returns null without throwing when window.chromeAi is undefined',
+          () async {
+        globalContext.delete('chromeAi'.toJS);
+        const client = WebChromeAiClient();
+        final result = await client.getNextStroke(
+          'prompt',
+          'system instruction',
+        );
+        expect(result, isNull);
+      });
     });
 
     group('JS Interop Bridge Assertions (Mocked window.chromeAi)', () {
@@ -119,19 +112,18 @@ void main() {
       );
 
       test(
-        'checkStatus returns "after-download" when JS promise resolves with "after-download"',
-        () async {
-          final mockAi = JSObject();
-          mockAi['checkStatus'] = (() {
-            return Future<JSString?>.value('after-download'.toJS).toJS;
-          }).toJS;
-          globalContext['chromeAi'] = mockAi;
+          'checkStatus returns "after-download" when JS promise resolves with "after-download"',
+          () async {
+        final mockAi = JSObject();
+        mockAi['checkStatus'] = (() {
+          return Future<JSString?>.value('after-download'.toJS).toJS;
+        }).toJS;
+        globalContext['chromeAi'] = mockAi;
 
-          const client = WebChromeAiClient();
-          final status = await client.checkStatus();
-          expect(status, equals('after-download'));
-        },
-      );
+        const client = WebChromeAiClient();
+        final status = await client.checkStatus();
+        expect(status, equals('after-download'));
+      });
 
       test(
         'checkStatus returns null cleanly when JS promise resolves to null',
@@ -166,29 +158,28 @@ void main() {
       );
 
       test(
-        'getNextStroke forwards prompt and system instruction and returns resolved string',
-        () async {
-          String? capturedPrompt;
-          String? capturedSystem;
-          final mockAi = JSObject();
-          mockAi['getNextStroke'] =
-              ((JSString prompt, JSString systemInstruction) {
-                capturedPrompt = prompt.toDart;
-                capturedSystem = systemInstruction.toDart;
-                return Future<JSString?>.value('generated response'.toJS).toJS;
-              }).toJS;
-          globalContext['chromeAi'] = mockAi;
+          'getNextStroke forwards prompt and system instruction and returns resolved string',
+          () async {
+        String? capturedPrompt;
+        String? capturedSystem;
+        final mockAi = JSObject();
+        mockAi['getNextStroke'] =
+            ((JSString prompt, JSString systemInstruction) {
+          capturedPrompt = prompt.toDart;
+          capturedSystem = systemInstruction.toDart;
+          return Future<JSString?>.value('generated response'.toJS).toJS;
+        }).toJS;
+        globalContext['chromeAi'] = mockAi;
 
-          const client = WebChromeAiClient();
-          final result = await client.getNextStroke(
-            'draw a circle',
-            'system prompt',
-          );
-          expect(result, equals('generated response'));
-          expect(capturedPrompt, equals('draw a circle'));
-          expect(capturedSystem, equals('system prompt'));
-        },
-      );
+        const client = WebChromeAiClient();
+        final result = await client.getNextStroke(
+          'draw a circle',
+          'system prompt',
+        );
+        expect(result, equals('generated response'));
+        expect(capturedPrompt, equals('draw a circle'));
+        expect(capturedSystem, equals('system prompt'));
+      });
 
       test(
         'getNextStroke returns null when JS promise resolves to null',
@@ -196,8 +187,8 @@ void main() {
           final mockAi = JSObject();
           mockAi['getNextStroke'] =
               ((JSString prompt, JSString systemInstruction) {
-                return Future<JSAny?>.value(null).toJS;
-              }).toJS;
+            return Future<JSAny?>.value(null).toJS;
+          }).toJS;
           globalContext['chromeAi'] = mockAi;
 
           const client = WebChromeAiClient();

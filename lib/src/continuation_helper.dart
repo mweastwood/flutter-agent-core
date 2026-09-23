@@ -153,8 +153,7 @@ Future<String?> runWithAutoContinuation({
 
   while (isTruncated && continuationCount < autoContinueLimit) {
     continuationCount++;
-    final continuationPrompt =
-        '$initialPrompt\n\n'
+    final continuationPrompt = '$initialPrompt\n\n'
         '[Assistant (Partial Response)]: $text\n\n'
         '[System: Your previous response was truncated. Continue generating the response from where you left off, starting with the next character, without repeating the partial response or adding introductions/explanations.]';
 

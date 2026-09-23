@@ -26,11 +26,10 @@ class AgentHistoryEntry {
     this.outputTokens,
     int? totalTokens,
     this.estimatedCostUsd,
-  }) : totalTokens =
-           totalTokens ??
-           (inputTokens != null && outputTokens != null
-               ? inputTokens + outputTokens
-               : null);
+  }) : totalTokens = totalTokens ??
+            (inputTokens != null && outputTokens != null
+                ? inputTokens + outputTokens
+                : null);
 
   Map<String, dynamic> toJson() {
     return {
@@ -55,8 +54,7 @@ class AgentHistoryEntry {
     final imageMap = json['image'] as Map<String, dynamic>?;
     final inTokens = json['inputTokens'] as int?;
     final outTokens = json['outputTokens'] as int?;
-    final totTokens =
-        json['totalTokens'] as int? ??
+    final totTokens = json['totalTokens'] as int? ??
         (inTokens != null && outTokens != null ? inTokens + outTokens : null);
     return AgentHistoryEntry(
       timestamp: DateTime.parse(json['timestamp'] as String),

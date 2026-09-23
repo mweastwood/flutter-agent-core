@@ -9,12 +9,11 @@ import 'package:flutter_agent_core/src/agent_history_entry.dart' as direct;
 void main() {
   group('AgentHistoryEntry Decoupling & Export Compatibility Tests', () {
     test(
-      'AgentHistoryEntry type identity across direct, harness, and barrel imports',
-      () {
-        expect(direct.AgentHistoryEntry, equals(barrel.AgentHistoryEntry));
-        expect(harness.AgentHistoryEntry, equals(direct.AgentHistoryEntry));
-      },
-    );
+        'AgentHistoryEntry type identity across direct, harness, and barrel imports',
+        () {
+      expect(direct.AgentHistoryEntry, equals(barrel.AgentHistoryEntry));
+      expect(harness.AgentHistoryEntry, equals(direct.AgentHistoryEntry));
+    });
 
     test(
       'AgentHistoryEntry can be instantiated and serialized via direct import',
@@ -86,34 +85,33 @@ void main() {
 
   group('AgentHistoryEntry.fromJson totalTokens fallback and precedence', () {
     test(
-      'falls back to sum of inputTokens and outputTokens when totalTokens is omitted or null',
-      () {
-        final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
+        'falls back to sum of inputTokens and outputTokens when totalTokens is omitted or null',
+        () {
+      final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
 
-        final entryOmitted = direct.AgentHistoryEntry.fromJson({
-          'timestamp': timestampStr,
-          'prompt': 'Prompt text',
-          'response': 'Response text',
-          'inputTokens': 120,
-          'outputTokens': 30,
-        });
-        expect(entryOmitted.inputTokens, equals(120));
-        expect(entryOmitted.outputTokens, equals(30));
-        expect(entryOmitted.totalTokens, equals(150));
+      final entryOmitted = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+        'inputTokens': 120,
+        'outputTokens': 30,
+      });
+      expect(entryOmitted.inputTokens, equals(120));
+      expect(entryOmitted.outputTokens, equals(30));
+      expect(entryOmitted.totalTokens, equals(150));
 
-        final entryNull = direct.AgentHistoryEntry.fromJson({
-          'timestamp': timestampStr,
-          'prompt': 'Prompt text',
-          'response': 'Response text',
-          'inputTokens': 120,
-          'outputTokens': 30,
-          'totalTokens': null,
-        });
-        expect(entryNull.inputTokens, equals(120));
-        expect(entryNull.outputTokens, equals(30));
-        expect(entryNull.totalTokens, equals(150));
-      },
-    );
+      final entryNull = direct.AgentHistoryEntry.fromJson({
+        'timestamp': timestampStr,
+        'prompt': 'Prompt text',
+        'response': 'Response text',
+        'inputTokens': 120,
+        'outputTokens': 30,
+        'totalTokens': null,
+      });
+      expect(entryNull.inputTokens, equals(120));
+      expect(entryNull.outputTokens, equals(30));
+      expect(entryNull.totalTokens, equals(150));
+    });
 
     test('explicit totalTokens takes precedence over sum', () {
       final timestampStr = DateTime(2026, 9, 12, 10, 0, 0).toIso8601String();
