@@ -782,5 +782,230 @@ void main() {
         });
       },
     );
+
+    test(
+      'RateLimiter prevents concurrency race condition in throttleBeforeRequest by serializing RPS limits for concurrent requests',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-rps-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10, // 10 RPS -> 100ms interval
+            description: 'Test concurrent limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire initial request at t = 0ms
+          limiter.throttleBeforeRequest(10);
+          expect(limiter.requestTimestamps.length, equals(1));
+
+          // Elapse 50ms (within the 100ms interval)
+          async.elapse(const Duration(milliseconds: 50));
+
+          // Now launch 3 concurrent requests at t = 50ms
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+
+          // Advance 50ms -> req1 should execute at t = 100ms
+          async.elapse(const Duration(milliseconds: 50));
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(
+            limiter.requestTimestamps[1].difference(
+              limiter.requestTimestamps[0],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+
+          // Advance another 100ms -> req2 should execute at t = 200ms
+          async.elapse(const Duration(milliseconds: 100));
+          expect(limiter.requestTimestamps.length, equals(3));
+          expect(
+            limiter.requestTimestamps[2].difference(
+              limiter.requestTimestamps[1],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+
+          // Advance another 100ms -> req3 should execute at t = 300ms
+          async.elapse(const Duration(milliseconds: 100));
+          expect(limiter.requestTimestamps.length, equals(4));
+          expect(
+            limiter.requestTimestamps[3].difference(
+              limiter.requestTimestamps[2],
+            ),
+            equals(const Duration(milliseconds: 100)),
+          );
+        });
+      },
+    );
+
+    test(
+      'RateLimiter serializes concurrent requests under Requests-Per-Minute (RPM) limits',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-rpm-model',
+            provider: CloudProvider.gemini,
+            limitRpm: 2, // 2 RPM limit
+            description: 'Test concurrent RPM limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire 2 initial requests at t = 0 (filling the 2 RPM capacity)
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+          expect(limiter.requestTimestamps.length, equals(2));
+
+          // Elapse 10 seconds
+          async.elapse(const Duration(seconds: 10));
+
+          // Launch 2 concurrent requests at t = 10s
+          limiter.throttleBeforeRequest(10);
+          limiter.throttleBeforeRequest(10);
+
+          // Both requests should be waiting since 2 requests are active in 1-minute window
+          expect(limiter.requestTimestamps.length, equals(2));
+
+          // Elapse to 60s + 100ms buffer from start (50.1s from t = 10s)
+          // Oldest requests at t = 0s expire and get pruned from sliding window,
+          // while the two queued requests execute at t = 60.1s.
+          async.elapse(const Duration(milliseconds: 50100));
+          async.flushMicrotasks();
+
+          // Queue now contains the 2 new request timestamps executed at t = 60.1s
+          expect(limiter.requestTimestamps.length, equals(2));
+          expect(
+            limiter.requestTimestamps.every(
+              (ts) => ts == DateTime(2026, 1, 1, 0, 1, 0, 100),
+            ),
+            isTrue,
+          );
+        });
+      },
+    );
+
+    test(
+      'RateLimiter serializes concurrent requests under Tokens-Per-Minute (TPM) limits',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-concurrent-tpm-model',
+            provider: CloudProvider.gemini,
+            limitTpm: 500, // 500 TPM limit
+            description: 'Test concurrent TPM limit',
+          );
+
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          // Fire initial request consuming 400 tokens at t = 0s
+          limiter.throttleBeforeRequest(400);
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(400));
+
+          // Elapse 10 seconds
+          async.elapse(const Duration(seconds: 10));
+
+          // Launch 3 concurrent requests at t = 10s consuming 200 tokens each.
+          // Remaining TPM capacity is 100 (500 - 400), so all 3 requests exceed capacity
+          // and must be serialized, waiting for the t = 0s request to expire at t = 60.1s.
+          limiter.throttleBeforeRequest(200);
+          limiter.throttleBeforeRequest(200);
+          limiter.throttleBeforeRequest(200);
+
+          // All 3 requests should be waiting at t = 10s
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(400));
+
+          // Advance to t = 60.1s (50.1s elapsed)
+          // The t = 0s request (400 tokens) expires and is pruned.
+          // Req 1 processes sequentially under lock, consumes 200 tokens (sum = 200 <= 500).
+          // Req 2 processes sequentially under lock, consumes 200 tokens (sum = 400 <= 500).
+          // Req 3 processes sequentially under lock, needs 200 tokens (sum = 600 > 500), so it must wait.
+          async.elapse(const Duration(milliseconds: 50100));
+          async.flushMicrotasks();
+
+          expect(limiter.tokenUsage.length, equals(2));
+          expect(limiter.runningTokenSum, equals(400));
+          expect(
+            limiter.tokenUsage.every(
+              (item) => item.timestamp == DateTime(2026, 1, 1, 0, 1, 0, 100),
+            ),
+            isTrue,
+          );
+
+          // Advance to t = 120.2s (60.1s elapsed from t = 60.1s)
+          // Req 1 and Req 2 (total 400 tokens from t = 60.1s) expire and get pruned.
+          // Req 3 processes, consuming 200 tokens (sum = 200 <= 500).
+          async.elapse(const Duration(milliseconds: 60100));
+          async.flushMicrotasks();
+
+          expect(limiter.tokenUsage.length, equals(1));
+          expect(limiter.runningTokenSum, equals(200));
+          expect(
+            limiter.tokenUsage.single.timestamp,
+            equals(DateTime(2026, 1, 1, 0, 2, 0, 200)),
+          );
+        });
+      },
+    );
+
+    test(
+      'RateLimiter handles lock exception resilience without failing subsequent queued requests',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final mockInfo = CloudModelInfo(
+            modelName: 'test-lock-resilience-model',
+            provider: CloudProvider.gemini,
+            limitRps: 10,
+            description: 'Test lock exception resilience',
+          );
+
+          var shouldThrow = false;
+          final limiter = RateLimiter(
+            modelInfo: mockInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () {
+              if (shouldThrow) {
+                throw StateError('Simulated lock error');
+              }
+              return clock.now();
+            },
+          );
+
+          // Trigger first request which throws an exception during throttle processing
+          shouldThrow = true;
+          final f1 = limiter.throttleBeforeRequest(10);
+          expect(f1, throwsA(isA<StateError>()));
+          async.flushMicrotasks();
+
+          // Reset throw flag
+          shouldThrow = false;
+
+          // Second request queued after the failed request should complete successfully
+          limiter.throttleBeforeRequest(10);
+          async.flushMicrotasks();
+          expect(limiter.requestTimestamps.length, equals(1));
+        });
+      },
+    );
   });
 }

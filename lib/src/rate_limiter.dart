@@ -19,6 +19,7 @@ class RateLimiter {
   final Queue<({DateTime timestamp, int tokenCount})> _tokenUsage =
       Queue<({DateTime timestamp, int tokenCount})>();
   int _runningTokenSum = 0;
+  Future<void>? _lockFuture;
 
   /// Creates a new [RateLimiter] instance.
   ///
@@ -67,92 +68,109 @@ class RateLimiter {
   }
 
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
-    final now = _now();
-    _pruneExpiredRequests(now, const Duration(minutes: 1));
-    if (_hasTpmLimit) {
-      _pruneExpiredTokens(now, const Duration(minutes: 1));
-    }
+    final previousLock = _lockFuture;
+    final currentCompleter = Completer<void>();
+    _lockFuture = currentCompleter.future;
 
-    if (throttlePercentage <= 0.0) {
-      _requestTimestamps.add(now);
-      if (_hasTpmLimit) {
-        _tokenUsage.add((timestamp: now, tokenCount: estimatedTokens));
-        _runningTokenSum += estimatedTokens;
+    try {
+      if (previousLock != null) {
+        try {
+          await previousLock;
+        } catch (_) {}
       }
-      return;
-    }
 
-    final double pctFactor = throttlePercentage / 100.0;
+      final now = _now();
+      _pruneExpiredRequests(now, const Duration(minutes: 1));
+      if (_hasTpmLimit) {
+        _pruneExpiredTokens(now, const Duration(minutes: 1));
+      }
 
-    if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
-      final double effectiveRps = modelInfo.limitRps! * pctFactor;
-      if (effectiveRps > 0) {
-        final double intervalMs = 1000 / effectiveRps;
-        if (intervalMs.isFinite && intervalMs <= 86400000) {
-          final requiredInterval = Duration(milliseconds: intervalMs.round());
-          if (_requestTimestamps.isNotEmpty) {
-            final lastRequestTime = _requestTimestamps.last;
-            final elapsed = now.difference(lastRequestTime);
-            if (elapsed < requiredInterval) {
-              final waitDuration = requiredInterval - elapsed;
-              if (waitDuration > Duration.zero) {
-                await Future.delayed(waitDuration);
+      if (throttlePercentage <= 0.0) {
+        _requestTimestamps.add(now);
+        if (_hasTpmLimit) {
+          _tokenUsage.add((timestamp: now, tokenCount: estimatedTokens));
+          _runningTokenSum += estimatedTokens;
+        }
+        return;
+      }
+
+      final double pctFactor = throttlePercentage / 100.0;
+
+      if (modelInfo.limitRps != null && modelInfo.limitRps! > 0) {
+        final double effectiveRps = modelInfo.limitRps! * pctFactor;
+        if (effectiveRps > 0) {
+          final double intervalMs = 1000 / effectiveRps;
+          if (intervalMs.isFinite && intervalMs <= 86400000) {
+            final requiredInterval = Duration(milliseconds: intervalMs.round());
+            if (_requestTimestamps.isNotEmpty) {
+              final lastRequestTime = _requestTimestamps.last;
+              final elapsed = now.difference(lastRequestTime);
+              if (elapsed < requiredInterval) {
+                final waitDuration = requiredInterval - elapsed;
+                if (waitDuration > Duration.zero) {
+                  await Future.delayed(waitDuration);
+                }
               }
             }
           }
         }
       }
-    }
 
-    if (modelInfo.limitRpm != null && modelInfo.limitRpm! > 0) {
-      final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
-      while (true) {
-        final checkTime = _now();
-        _pruneExpiredRequests(checkTime, const Duration(minutes: 1));
-        if (_requestTimestamps.length < effectiveRpm) {
-          break;
-        }
-        if (_requestTimestamps.isEmpty) break;
-        final oldestInWindow = _requestTimestamps.first;
-        final waitDuration =
-            const Duration(minutes: 1) -
-            checkTime.difference(oldestInWindow) +
-            _throttleWaitBuffer;
-        if (waitDuration > Duration.zero) {
-          await Future.delayed(waitDuration);
-        }
-      }
-    }
-
-    if (_hasTpmLimit) {
-      final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
-      while (true) {
-        final checkTime = _now();
-        _pruneExpiredTokens(checkTime, const Duration(minutes: 1));
-
-        if (_runningTokenSum + estimatedTokens <= effectiveTpm) {
-          break;
-        }
-        if (_tokenUsage.isEmpty) break;
-        final oldestInWindow = _tokenUsage.first;
-        final waitDuration =
-            const Duration(minutes: 1) -
-            checkTime.difference(oldestInWindow.timestamp) +
-            _throttleWaitBuffer;
-        if (waitDuration > Duration.zero) {
-          await Future.delayed(waitDuration);
+      if (modelInfo.limitRpm != null && modelInfo.limitRpm! > 0) {
+        final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
+        while (true) {
+          final checkTime = _now();
+          _pruneExpiredRequests(checkTime, const Duration(minutes: 1));
+          if (_requestTimestamps.length < effectiveRpm) {
+            break;
+          }
+          if (_requestTimestamps.isEmpty) break;
+          final oldestInWindow = _requestTimestamps.first;
+          final waitDuration =
+              const Duration(minutes: 1) -
+              checkTime.difference(oldestInWindow) +
+              _throttleWaitBuffer;
+          if (waitDuration > Duration.zero) {
+            await Future.delayed(waitDuration);
+          }
         }
       }
-    }
 
-    final actualRequestTime = _now();
-    _requestTimestamps.add(actualRequestTime);
-    if (_hasTpmLimit) {
-      _tokenUsage.add((
-        timestamp: actualRequestTime,
-        tokenCount: estimatedTokens,
-      ));
-      _runningTokenSum += estimatedTokens;
+      if (_hasTpmLimit) {
+        final double effectiveTpm = modelInfo.limitTpm! * pctFactor;
+        while (true) {
+          final checkTime = _now();
+          _pruneExpiredTokens(checkTime, const Duration(minutes: 1));
+
+          if (_runningTokenSum + estimatedTokens <= effectiveTpm) {
+            break;
+          }
+          if (_tokenUsage.isEmpty) break;
+          final oldestInWindow = _tokenUsage.first;
+          final waitDuration =
+              const Duration(minutes: 1) -
+              checkTime.difference(oldestInWindow.timestamp) +
+              _throttleWaitBuffer;
+          if (waitDuration > Duration.zero) {
+            await Future.delayed(waitDuration);
+          }
+        }
+      }
+
+      final actualRequestTime = _now();
+      _requestTimestamps.add(actualRequestTime);
+      if (_hasTpmLimit) {
+        _tokenUsage.add((
+          timestamp: actualRequestTime,
+          tokenCount: estimatedTokens,
+        ));
+        _runningTokenSum += estimatedTokens;
+      }
+    } finally {
+      currentCompleter.complete();
+      if (_lockFuture == currentCompleter.future) {
+        _lockFuture = null;
+      }
     }
   }
 }
