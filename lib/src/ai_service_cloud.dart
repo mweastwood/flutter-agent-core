@@ -39,25 +39,27 @@ class CloudAiService extends AiService {
     this.maxRetryDelay = const Duration(seconds: 15),
     this.enableJitter = true,
     http.Client? httpClient,
-    this._random,
-  }) : _httpClient = httpClient ?? http.Client(),
-       _ownsHttpClient = httpClient == null,
-       _endpointUri = Uri.parse(
-         '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
-       ),
-       _headers = Map.unmodifiable({
-         'Content-Type': 'application/json',
-         'Authorization': 'Bearer ${apiKey.replaceAll(_reNonAscii, '').trim()}',
-       }),
-       _rateLimiter = (() {
-         final info = CloudModelDatabase.getModelInfo(modelName);
-         return info != null
-             ? RateLimiter(
-                 modelInfo: info,
-                 throttlePercentage: throttlePercentage,
-               )
-             : null;
-       })();
+    Random? random,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _ownsHttpClient = httpClient == null,
+        _random = random,
+        _endpointUri = Uri.parse(
+          '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
+        ),
+        _headers = Map.unmodifiable({
+          'Content-Type': 'application/json',
+          'Authorization':
+              'Bearer ${apiKey.replaceAll(_reNonAscii, '').trim()}',
+        }),
+        _rateLimiter = (() {
+          final info = CloudModelDatabase.getModelInfo(modelName);
+          return info != null
+              ? RateLimiter(
+                  modelInfo: info,
+                  throttlePercentage: throttlePercentage,
+                )
+              : null;
+        })();
 
   /// Closes the internal [http.Client] if it was created and owned by this instance.
   @override
@@ -89,7 +91,8 @@ class CloudAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async =>
+      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 
   @visibleForTesting
   Duration calculateBackoff(int attempt, http.Response? response) =>
@@ -128,12 +131,13 @@ class CloudAiService extends AiService {
     double temperature = 1.0,
     int? maxOutputTokens,
   }) async {
+    int? estimatedPromptTokens;
     if (_rateLimiter != null) {
-      final estimatedTokens = await countTokens(
+      estimatedPromptTokens = await countTokens(
         prompt: prompt,
         imageBytes: imageBytes,
       );
-      await _rateLimiter.throttleBeforeRequest(estimatedTokens);
+      await _rateLimiter.throttleBeforeRequest(estimatedPromptTokens);
     }
 
     final List<Map<String, dynamic>> messages = [];
@@ -157,7 +161,7 @@ class CloudAiService extends AiService {
       'model': modelName,
       'messages': messages,
       'temperature': temperature,
-      'max_tokens': ?maxOutputTokens,
+      if (maxOutputTokens != null) 'max_tokens': maxOutputTokens,
     });
 
     dynamic lastError;
@@ -187,8 +191,7 @@ class CloudAiService extends AiService {
         );
 
         // Check if retryable status code: 429 (Rate Limit), 500, 502, 503, 504 (Server Errors)
-        final isRetryable =
-            response.statusCode == 429 ||
+        final isRetryable = response.statusCode == 429 ||
             response.statusCode == 500 ||
             response.statusCode == 502 ||
             response.statusCode == 503 ||
@@ -255,10 +258,8 @@ class CloudAiService extends AiService {
       int? totalTokens = usage?['total_tokens'] as int?;
 
       if (text != null) {
-        inputTokens ??= await countTokens(
-          prompt: prompt,
-          imageBytes: imageBytes,
-        );
+        inputTokens ??= estimatedPromptTokens ??
+            await countTokens(prompt: prompt, imageBytes: imageBytes);
         outputTokens ??= await countTokens(prompt: text);
         totalTokens ??= inputTokens + outputTokens;
       }

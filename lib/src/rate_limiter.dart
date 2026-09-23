@@ -28,8 +28,8 @@ class RateLimiter {
     required this.modelInfo,
     this.throttlePercentage = 100.0,
     DateTime Function()? nowProvider,
-  }) : _now = nowProvider ?? DateTime.now,
-       _hasTpmLimit = modelInfo.limitTpm != null && modelInfo.limitTpm! > 0;
+  })  : _now = nowProvider ?? DateTime.now,
+        _hasTpmLimit = modelInfo.limitTpm != null && modelInfo.limitTpm! > 0;
 
   @visibleForTesting
   List<DateTime> get requestTimestamps => List.unmodifiable(_requestTimestamps);
@@ -114,8 +114,7 @@ class RateLimiter {
         }
         if (_requestTimestamps.isEmpty) break;
         final oldestInWindow = _requestTimestamps.first;
-        final waitDuration =
-            const Duration(minutes: 1) -
+        final waitDuration = const Duration(minutes: 1) -
             checkTime.difference(oldestInWindow) +
             _throttleWaitBuffer;
         if (waitDuration > Duration.zero) {
@@ -135,8 +134,7 @@ class RateLimiter {
         }
         if (_tokenUsage.isEmpty) break;
         final oldestInWindow = _tokenUsage.first;
-        final waitDuration =
-            const Duration(minutes: 1) -
+        final waitDuration = const Duration(minutes: 1) -
             checkTime.difference(oldestInWindow.timestamp) +
             _throttleWaitBuffer;
         if (waitDuration > Duration.zero) {

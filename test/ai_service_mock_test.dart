@@ -7,16 +7,15 @@ import 'package:flutter_agent_core/flutter_agent_core.dart';
 void main() {
   group('MockAiService Tests', () {
     test(
-      'triggerDownload transitions status to available immediately when delay is zero',
-      () async {
-        final service = MockAiService();
-        service.setMockStatus(AiCoreStatus.downloadable);
-        expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
+        'triggerDownload transitions status to available immediately when delay is zero',
+        () async {
+      final service = MockAiService();
+      service.setMockStatus(AiCoreStatus.downloadable);
+      expect(await service.checkStatus(), equals(AiCoreStatus.downloadable));
 
-        await service.triggerDownload();
-        expect(await service.checkStatus(), equals(AiCoreStatus.available));
-      },
-    );
+      await service.triggerDownload();
+      expect(await service.checkStatus(), equals(AiCoreStatus.available));
+    });
 
     test(
       'triggerDownload updates status to downloading then available with delay',
@@ -74,17 +73,14 @@ void main() {
     });
 
     test(
-      'triggerDownload allows overriding non-zero downloadDelay with Duration.zero',
-      () async {
-        final service = MockAiService(
-          downloadDelay: const Duration(seconds: 10),
-        );
-        service.setMockStatus(AiCoreStatus.downloadable);
+        'triggerDownload allows overriding non-zero downloadDelay with Duration.zero',
+        () async {
+      final service = MockAiService(downloadDelay: const Duration(seconds: 10));
+      service.setMockStatus(AiCoreStatus.downloadable);
 
-        await service.triggerDownload(delay: Duration.zero);
-        expect(await service.checkStatus(), equals(AiCoreStatus.available));
-      },
-    );
+      await service.triggerDownload(delay: Duration.zero);
+      expect(await service.checkStatus(), equals(AiCoreStatus.available));
+    });
 
     test(
       'concurrent triggerDownload calls share and await active download Future',
@@ -184,35 +180,33 @@ void main() {
 
     group('generateContentRaw', () {
       test(
-        'simulates initial truncated response when prompt contains simulate_truncation without partial marker',
-        () async {
-          final service = MockAiService();
-          final response = await service.generateContentRaw(
-            prompt: 'Please simulate_truncation in this test',
-          );
+          'simulates initial truncated response when prompt contains simulate_truncation without partial marker',
+          () async {
+        final service = MockAiService();
+        final response = await service.generateContentRaw(
+          prompt: 'Please simulate_truncation in this test',
+        );
 
-          expect(response, isNotNull);
-          expect(response!.text, equals('Response is partial and'));
-          expect(response.isTruncated, isTrue);
-          expect(response.isError, isFalse);
-        },
-      );
+        expect(response, isNotNull);
+        expect(response!.text, equals('Response is partial and'));
+        expect(response.isTruncated, isTrue);
+        expect(response.isError, isFalse);
+      });
 
       test(
-        'simulates completed continuation response when prompt contains simulate_truncation and partial marker',
-        () async {
-          final service = MockAiService();
-          final response = await service.generateContentRaw(
-            prompt:
-                'simulate_truncation [Assistant (Partial Response)]: Response is partial and',
-          );
+          'simulates completed continuation response when prompt contains simulate_truncation and partial marker',
+          () async {
+        final service = MockAiService();
+        final response = await service.generateContentRaw(
+          prompt:
+              'simulate_truncation [Assistant (Partial Response)]: Response is partial and',
+        );
 
-          expect(response, isNotNull);
-          expect(response!.text, equals(' finished successfully.'));
-          expect(response.isTruncated, isFalse);
-          expect(response.isError, isFalse);
-        },
-      );
+        expect(response, isNotNull);
+        expect(response!.text, equals(' finished successfully.'));
+        expect(response.isTruncated, isFalse);
+        expect(response.isError, isFalse);
+      });
 
       test('returns mock palette color JSON when temperature <= 0.5', () async {
         final service = MockAiService();
@@ -235,31 +229,30 @@ void main() {
       });
 
       test(
-        'returns default ReAct tool finish JSON when temperature > 0.5 and truncation is not requested',
-        () async {
-          final service = MockAiService();
+          'returns default ReAct tool finish JSON when temperature > 0.5 and truncation is not requested',
+          () async {
+        final service = MockAiService();
 
-          final response = await service.generateContentRaw(
-            prompt: 'Explain what you can do',
-            temperature: 1.0,
-            imageBytes: Uint8List.fromList([1, 2, 3]),
-            maxOutputTokens: 100,
-          );
+        final response = await service.generateContentRaw(
+          prompt: 'Explain what you can do',
+          temperature: 1.0,
+          imageBytes: Uint8List.fromList([1, 2, 3]),
+          maxOutputTokens: 100,
+        );
 
-          expect(response, isNotNull);
-          expect(response!.isTruncated, isFalse);
-          expect(
-            response.text,
-            equals(
-              '{\n'
-              '  "understanding": "Mock generic reasoning.",\n'
-              '  "tool": "finish",\n'
-              '  "params": []\n'
-              '}',
-            ),
-          );
-        },
-      );
+        expect(response, isNotNull);
+        expect(response!.isTruncated, isFalse);
+        expect(
+          response.text,
+          equals(
+            '{\n'
+            '  "understanding": "Mock generic reasoning.",\n'
+            '  "tool": "finish",\n'
+            '  "params": []\n'
+            '}',
+          ),
+        );
+      });
     });
 
     group('generateContent', () {
@@ -298,25 +291,24 @@ void main() {
 
     group('countTokens', () {
       test(
-        'estimates text tokens as (prompt.length / 4).round() when imageBytes is null or empty',
-        () async {
-          final service = MockAiService();
+          'estimates text tokens as (prompt.length / 4).round() when imageBytes is null or empty',
+          () async {
+        final service = MockAiService();
 
-          expect(await service.countTokens(prompt: ''), equals(0));
-          expect(await service.countTokens(prompt: '1234'), equals(1));
-          expect(await service.countTokens(prompt: '12345'), equals(1));
-          expect(await service.countTokens(prompt: '123456'), equals(2));
-          expect(await service.countTokens(prompt: '12345678'), equals(2));
+        expect(await service.countTokens(prompt: ''), equals(0));
+        expect(await service.countTokens(prompt: '1234'), equals(1));
+        expect(await service.countTokens(prompt: '12345'), equals(1));
+        expect(await service.countTokens(prompt: '123456'), equals(2));
+        expect(await service.countTokens(prompt: '12345678'), equals(2));
 
-          expect(
-            await service.countTokens(
-              prompt: '12345678',
-              imageBytes: Uint8List(0),
-            ),
-            equals(2),
-          );
-        },
-      );
+        expect(
+          await service.countTokens(
+            prompt: '12345678',
+            imageBytes: Uint8List(0),
+          ),
+          equals(2),
+        );
+      });
 
       test(
         'adds 256 tokens when imageBytes is not null and not empty',

@@ -84,8 +84,7 @@ class MockAiService extends AiService {
     }
 
     return AiResponse(
-      text:
-          '{\n'
+      text: '{\n'
           '  "understanding": "Mock generic reasoning.",\n'
           '  "tool": "finish",\n'
           '  "params": []\n'
@@ -114,5 +113,6 @@ class MockAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async =>
+      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 }
