@@ -4,6 +4,8 @@ library;
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
+import 'package:flutter_agent_core/flutter_agent_core.dart';
+import 'package:flutter_agent_core/src/ai_service_web.dart';
 import 'package:flutter_agent_core/src/chrome_ai_client.dart';
 import 'package:flutter_agent_core/src/chrome_ai_client_web.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -29,6 +31,16 @@ void main() {
         'createDefaultChromeAiClient returns a non-null WebChromeAiClient instance',
         () {
           final client = createDefaultChromeAiClient();
+          expect(client, isNotNull);
+          expect(client, isA<WebChromeAiClient>());
+          expect(client, isA<ChromeAiClient>());
+        },
+      );
+
+      test(
+        'defaultChromeAiClient returns a non-null WebChromeAiClient instance',
+        () {
+          final client = defaultChromeAiClient;
           expect(client, isNotNull);
           expect(client, isA<WebChromeAiClient>());
           expect(client, isA<ChromeAiClient>());
@@ -206,6 +218,31 @@ void main() {
             'system prompt',
           );
           expect(result, isNull);
+        },
+      );
+    });
+
+    group('WebAiService Integration', () {
+      test(
+        'WebAiService defaults to defaultChromeAiClient when client is omitted or null',
+        () async {
+          final mockAi = JSObject();
+          mockAi['checkStatus'] = (() {
+            return Future<JSString?>.value('readily'.toJS).toJS;
+          }).toJS;
+          globalContext['chromeAi'] = mockAi;
+
+          final serviceDefault = WebAiService();
+          expect(
+            await serviceDefault.checkStatus(),
+            equals(AiCoreStatus.available),
+          );
+
+          final serviceExplicitNull = WebAiService(client: null);
+          expect(
+            await serviceExplicitNull.checkStatus(),
+            equals(AiCoreStatus.available),
+          );
         },
       );
     });
