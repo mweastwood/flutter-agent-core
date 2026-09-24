@@ -575,13 +575,9 @@ void main() {
       expect(() => getWebAiService(), throwsA(isA<UnsupportedError>()));
     }, skip: kIsWeb);
 
-    test(
-      'defaultChromeAiClient returns null on VM/non-web platforms',
-      () {
-        expect(defaultChromeAiClient, isNull);
-      },
-      skip: kIsWeb,
-    );
+    test('defaultChromeAiClient returns null on VM/non-web platforms', () {
+      expect(defaultChromeAiClient, isNull);
+    }, skip: kIsWeb);
 
     test(
       'createDefaultChromeAiClient() returns null on VM/non-web platforms',
