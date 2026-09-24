@@ -171,6 +171,22 @@ void main() {
       expect(service.downloadDelay, equals(const Duration(seconds: 5)));
     });
 
+    test('MockAiService generationDelay is mutable', () {
+      final service = MockAiService(generationDelay: Duration.zero);
+      expect(service.generationDelay, equals(Duration.zero));
+      service.generationDelay = const Duration(seconds: 5);
+      expect(service.generationDelay, equals(const Duration(seconds: 5)));
+    });
+
+    test(
+      'MockAiService defaults generationDelay and downloadDelay to Duration.zero',
+      () {
+        final service = MockAiService();
+        expect(service.generationDelay, equals(Duration.zero));
+        expect(service.downloadDelay, equals(Duration.zero));
+      },
+    );
+
     test(
       'triggerDownload does nothing if status is not downloadable',
       () async {
@@ -183,6 +199,54 @@ void main() {
     );
 
     group('generateContentRaw', () {
+      test('respects generationDelay under fakeAsync', () {
+        fakeAsync((async) {
+          final service = MockAiService(
+            generationDelay: const Duration(milliseconds: 100),
+          );
+
+          AiResponse? result;
+          service
+              .generateContentRaw(prompt: 'test')
+              .then((value) => result = value);
+
+          expect(result, isNull);
+          async.elapse(const Duration(milliseconds: 99));
+          expect(result, isNull);
+
+          async.elapse(const Duration(milliseconds: 1));
+          expect(result, isNotNull);
+          expect(result!.text, contains('Mock generic reasoning.'));
+        });
+      });
+
+      test(
+        'executes immediately without delay when generationDelay is zero or negative',
+        () {
+          fakeAsync((async) {
+            final service = MockAiService(generationDelay: Duration.zero);
+
+            AiResponse? result;
+            service
+                .generateContentRaw(prompt: 'test zero delay')
+                .then((value) => result = value);
+
+            async.flushMicrotasks();
+            expect(result, isNotNull);
+            expect(result!.text, contains('Mock generic reasoning.'));
+
+            service.generationDelay = const Duration(milliseconds: -50);
+            AiResponse? negativeResult;
+            service
+                .generateContentRaw(prompt: 'test negative delay')
+                .then((value) => negativeResult = value);
+
+            async.flushMicrotasks();
+            expect(negativeResult, isNotNull);
+            expect(negativeResult!.text, contains('Mock generic reasoning.'));
+          });
+        },
+      );
       test(
         'simulates initial truncated response when prompt contains simulate_truncation without partial marker',
         () async {
@@ -263,6 +327,27 @@ void main() {
     });
 
     group('generateContent', () {
+      test('respects generationDelay under fakeAsync', () {
+        fakeAsync((async) {
+          final service = MockAiService(
+            generationDelay: const Duration(milliseconds: 100),
+          );
+
+          String? result;
+          service
+              .generateContent(prompt: 'test')
+              .then((value) => result = value);
+
+          expect(result, isNull);
+          async.elapse(const Duration(milliseconds: 99));
+          expect(result, isNull);
+
+          async.elapse(const Duration(milliseconds: 1));
+          expect(result, isNotNull);
+          expect(result, contains('Mock generic reasoning.'));
+        });
+      });
+
       test(
         'forwards parameters to generateContentRaw and returns extracted text',
         () async {
