@@ -13,7 +13,15 @@ class MockAiService extends AiService {
   /// Defaults to [Duration.zero] if not specified.
   Duration downloadDelay;
 
-  MockAiService({this.downloadDelay = Duration.zero});
+  /// Default delay for simulated text generation operations in [generateContentRaw].
+  ///
+  /// Defaults to [Duration.zero] if not specified.
+  Duration generationDelay;
+
+  MockAiService({
+    this.downloadDelay = Duration.zero,
+    this.generationDelay = Duration.zero,
+  });
 
   @override
   Future<AiCoreStatus> checkStatus() async {
@@ -70,7 +78,9 @@ class MockAiService extends AiService {
     double temperature = 1.0,
     int? maxOutputTokens,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 100));
+    if (generationDelay > Duration.zero) {
+      await Future.delayed(generationDelay);
+    }
 
     if (prompt.contains('simulate_truncation')) {
       if (prompt.contains('[Assistant (Partial Response)]:')) {
