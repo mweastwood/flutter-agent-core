@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_agent_core/flutter_agent_core.dart';
 import 'package:flutter_agent_core/src/ai_service_stub.dart'
     if (dart.library.html) 'package:flutter_agent_core/src/ai_service_web.dart';
+import 'package:flutter_agent_core/src/chrome_ai_client.dart';
+import 'package:flutter_agent_core/src/chrome_ai_client_stub.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -572,6 +574,22 @@ void main() {
         () {
       expect(() => getWebAiService(), throwsA(isA<UnsupportedError>()));
     }, skip: kIsWeb);
+
+    test(
+      'defaultChromeAiClient returns null on VM/non-web platforms',
+      () {
+        expect(defaultChromeAiClient, isNull);
+      },
+      skip: kIsWeb,
+    );
+
+    test(
+      'createDefaultChromeAiClient() returns null on VM/non-web platforms',
+      () {
+        expect(createDefaultChromeAiClient(), isNull);
+      },
+      skip: kIsWeb,
+    );
   });
 
   group('aiServiceProvider Tests', () {
