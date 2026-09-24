@@ -6,7 +6,6 @@ import 'dart:js_interop_unsafe';
 
 import 'package:flutter_agent_core/flutter_agent_core.dart';
 import 'package:flutter_agent_core/src/ai_service_web.dart';
-import 'package:flutter_agent_core/src/chrome_ai_client.dart';
 import 'package:flutter_agent_core/src/chrome_ai_client_web.dart';
 import 'package:flutter_test/flutter_test.dart';
 
