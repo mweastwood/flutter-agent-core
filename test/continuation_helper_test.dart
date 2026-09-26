@@ -270,76 +270,75 @@ void main() {
     );
 
     test(
-      'handles explicit object closing directly following trailing comma or incomplete entries',
-      () {
-        final obj1 = repairJson('{"a": 1, }');
-        expect(obj1, equals('{"a": 1}'));
-        expect(jsonDecode(obj1), equals({'a': 1}));
+        'handles explicit object closing directly following trailing comma or incomplete entries',
+        () {
+      final obj1 = repairJson('{"a": 1, }');
+      expect(obj1, equals('{"a": 1}'));
+      expect(jsonDecode(obj1), equals({'a': 1}));
 
-        final obj2 = repairJson('{"a": 1, "b": 2, }');
-        expect(obj2, equals('{"a": 1, "b": 2}'));
-        expect(jsonDecode(obj2), equals({'a': 1, 'b': 2}));
+      final obj2 = repairJson('{"a": 1, "b": 2, }');
+      expect(obj2, equals('{"a": 1, "b": 2}'));
+      expect(jsonDecode(obj2), equals({'a': 1, 'b': 2}));
 
-        final obj3 = repairJson('{"a": 1, "b": }');
-        expect(obj3, equals('{"a": 1}'));
-        expect(jsonDecode(obj3), equals({'a': 1}));
+      final obj3 = repairJson('{"a": 1, "b": }');
+      expect(obj3, equals('{"a": 1}'));
+      expect(jsonDecode(obj3), equals({'a': 1}));
 
-        final obj4 = repairJson('{"a": 1, "b"}');
-        expect(obj4, equals('{"a": 1}'));
-        expect(jsonDecode(obj4), equals({'a': 1}));
+      final obj4 = repairJson('{"a": 1, "b"}');
+      expect(obj4, equals('{"a": 1}'));
+      expect(jsonDecode(obj4), equals({'a': 1}));
 
-        final obj5 = repairJson('{"a": }');
-        expect(obj5, equals('{}'));
-        expect(jsonDecode(obj5), equals(<String, dynamic>{}));
+      final obj5 = repairJson('{"a": }');
+      expect(obj5, equals('{}'));
+      expect(jsonDecode(obj5), equals(<String, dynamic>{}));
 
-        final obj6 = repairJson('{"a"}');
-        expect(obj6, equals('{}'));
-        expect(jsonDecode(obj6), equals(<String, dynamic>{}));
+      final obj6 = repairJson('{"a"}');
+      expect(obj6, equals('{}'));
+      expect(jsonDecode(obj6), equals(<String, dynamic>{}));
 
-        final obj7 = repairJson('{, }');
-        expect(obj7, equals('{}'));
-        expect(jsonDecode(obj7), equals(<String, dynamic>{}));
+      final obj7 = repairJson('{, }');
+      expect(obj7, equals('{}'));
+      expect(jsonDecode(obj7), equals(<String, dynamic>{}));
 
-        final nested1 = repairJson('{"outer": {"a": 1, }}');
-        expect(nested1, equals('{"outer": {"a": 1}}'));
-        expect(
-          jsonDecode(nested1),
-          equals({
-            'outer': {'a': 1},
-          }),
-        );
+      final nested1 = repairJson('{"outer": {"a": 1, }}');
+      expect(nested1, equals('{"outer": {"a": 1}}'));
+      expect(
+        jsonDecode(nested1),
+        equals({
+          'outer': {'a': 1},
+        }),
+      );
 
-        final nested2 = repairJson('{"outer": {"a": 1, }, "b": 2}');
-        expect(nested2, equals('{"outer": {"a": 1}, "b": 2}'));
-        expect(
-          jsonDecode(nested2),
-          equals({
-            'outer': {'a': 1},
-            'b': 2,
-          }),
-        );
+      final nested2 = repairJson('{"outer": {"a": 1, }, "b": 2}');
+      expect(nested2, equals('{"outer": {"a": 1}, "b": 2}'));
+      expect(
+        jsonDecode(nested2),
+        equals({
+          'outer': {'a': 1},
+          'b': 2,
+        }),
+      );
 
-        final nested3 = repairJson('[{"a": 1, }]');
-        expect(nested3, equals('[{"a": 1}]'));
-        expect(
-          jsonDecode(nested3),
-          equals([
-            {'a': 1},
-          ]),
-        );
+      final nested3 = repairJson('[{"a": 1, }]');
+      expect(nested3, equals('[{"a": 1}]'));
+      expect(
+        jsonDecode(nested3),
+        equals([
+          {'a': 1},
+        ]),
+      );
 
-        final nested4 = repairJson('{"data": {"nested": {"a": 1, "b": }}}');
-        expect(nested4, equals('{"data": {"nested": {"a": 1}}}'));
-        expect(
-          jsonDecode(nested4),
-          equals({
-            'data': {
-              'nested': {'a': 1},
-            },
-          }),
-        );
-      },
-    );
+      final nested4 = repairJson('{"data": {"nested": {"a": 1, "b": }}}');
+      expect(nested4, equals('{"data": {"nested": {"a": 1}}}'));
+      expect(
+        jsonDecode(nested4),
+        equals({
+          'data': {
+            'nested': {'a': 1},
+          },
+        }),
+      );
+    });
 
     test('handles stray closing delimiters with empty container stack', () {
       expect(repairJson('}'), equals('}'));

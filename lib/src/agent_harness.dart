@@ -68,8 +68,7 @@ class AgentHarness<T> {
       }
 
       final errorVal = parsed['error'];
-      final hasError =
-          errorVal != null &&
+      final hasError = errorVal != null &&
           errorVal != false &&
           (errorVal is! String || errorVal.trim().isNotEmpty);
       if (hasError) {

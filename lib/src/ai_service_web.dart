@@ -13,7 +13,7 @@ class WebAiService extends AiService {
   final ChromeAiClient? _client;
 
   WebAiService({ChromeAiClient? client})
-    : _client = client ?? defaultChromeAiClient;
+      : _client = client ?? defaultChromeAiClient;
 
   @override
   Future<AiCoreStatus> checkStatus() async {
@@ -111,5 +111,6 @@ class WebAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async => AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+  }) async =>
+      AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 }

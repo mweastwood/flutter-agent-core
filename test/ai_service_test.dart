@@ -61,7 +61,8 @@ class TestFakeAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async => 10;
+  }) async =>
+      10;
 }
 
 class TestContinuationAiService extends AiService {
@@ -92,7 +93,8 @@ class TestContinuationAiService extends AiService {
     Uint8List? imageBytes,
     double temperature = 1.0,
     int? maxOutputTokens,
-  }) async => null;
+  }) async =>
+      null;
 
   @override
   Future<AiResponse?> generateContentRaw({
@@ -115,7 +117,8 @@ class TestContinuationAiService extends AiService {
   Future<int> countTokens({
     required String prompt,
     Uint8List? imageBytes,
-  }) async => 10;
+  }) async =>
+      10;
 }
 
 void main() {
@@ -128,16 +131,15 @@ void main() {
     });
 
     test(
-      'calculates totalTokens automatically when input and output tokens are set',
-      () {
-        final response = AiResponse(
-          text: 'hello',
-          inputTokens: 15,
-          outputTokens: 25,
-        );
-        expect(response.totalTokens, equals(40));
-      },
-    );
+        'calculates totalTokens automatically when input and output tokens are set',
+        () {
+      final response = AiResponse(
+        text: 'hello',
+        inputTokens: 15,
+        outputTokens: 25,
+      );
+      expect(response.totalTokens, equals(40));
+    });
 
     test('uses explicit totalTokens when provided', () {
       final response = AiResponse(
@@ -196,27 +198,26 @@ void main() {
     );
 
     test(
-      'generateContentRaw wraps generateContent text in AiResponse and forwards imageBytes',
-      () async {
-        final service = TestFakeAiService()..mockContent = 'Hello world';
-        expect(service.generateContentCallCount, equals(0));
-        final imageBytes = Uint8List.fromList([1, 2, 3]);
-        final raw = await service.generateContentRaw(
-          prompt: 'test prompt',
-          imageBytes: imageBytes,
-          temperature: 0.8,
-          maxOutputTokens: 50,
-        );
-        expect(raw, isNotNull);
-        expect(raw!.text, equals('Hello world'));
-        expect(raw.isTruncated, isFalse);
-        expect(service.capturedPrompt, equals('test prompt'));
-        expect(service.capturedImageBytes, equals(imageBytes));
-        expect(service.capturedTemperature, equals(0.8));
-        expect(service.capturedMaxOutputTokens, equals(50));
-        expect(service.generateContentCallCount, equals(1));
-      },
-    );
+        'generateContentRaw wraps generateContent text in AiResponse and forwards imageBytes',
+        () async {
+      final service = TestFakeAiService()..mockContent = 'Hello world';
+      expect(service.generateContentCallCount, equals(0));
+      final imageBytes = Uint8List.fromList([1, 2, 3]);
+      final raw = await service.generateContentRaw(
+        prompt: 'test prompt',
+        imageBytes: imageBytes,
+        temperature: 0.8,
+        maxOutputTokens: 50,
+      );
+      expect(raw, isNotNull);
+      expect(raw!.text, equals('Hello world'));
+      expect(raw.isTruncated, isFalse);
+      expect(service.capturedPrompt, equals('test prompt'));
+      expect(service.capturedImageBytes, equals(imageBytes));
+      expect(service.capturedTemperature, equals(0.8));
+      expect(service.capturedMaxOutputTokens, equals(50));
+      expect(service.generateContentCallCount, equals(1));
+    });
 
     test('dispose defaults to a safe no-op on base class', () {
       final service = TestFakeAiService();
@@ -248,32 +249,31 @@ void main() {
     );
 
     test(
-      'handles imageBytes variations (null, empty Uint8List, non-empty Uint8List)',
-      () {
-        expect(
-          AiService.estimateTokenCount('12345678', imageBytes: null),
-          equals(2),
-        );
-        expect(
-          AiService.estimateTokenCount('12345678', imageBytes: Uint8List(0)),
-          equals(2),
-        );
-        expect(
-          AiService.estimateTokenCount(
-            '',
-            imageBytes: Uint8List.fromList([1, 2, 3]),
-          ),
-          equals(256),
-        );
-        expect(
-          AiService.estimateTokenCount(
-            '12345678',
-            imageBytes: Uint8List.fromList([10, 20, 30, 40]),
-          ),
-          equals(258),
-        );
-      },
-    );
+        'handles imageBytes variations (null, empty Uint8List, non-empty Uint8List)',
+        () {
+      expect(
+        AiService.estimateTokenCount('12345678', imageBytes: null),
+        equals(2),
+      );
+      expect(
+        AiService.estimateTokenCount('12345678', imageBytes: Uint8List(0)),
+        equals(2),
+      );
+      expect(
+        AiService.estimateTokenCount(
+          '',
+          imageBytes: Uint8List.fromList([1, 2, 3]),
+        ),
+        equals(256),
+      );
+      expect(
+        AiService.estimateTokenCount(
+          '12345678',
+          imageBytes: Uint8List.fromList([10, 20, 30, 40]),
+        ),
+        equals(258),
+      );
+    });
   });
 
   group('AiService.calculateExponentialBackoff Tests', () {
@@ -317,46 +317,45 @@ void main() {
     });
 
     test(
-      'clamps backoff at maxRetryDelay and bit-shift overflow immunity with large attempts',
-      () {
-        expect(
-          AiService.calculateExponentialBackoff(
-            attempt: 3,
-            initialRetryDelay: const Duration(milliseconds: 500),
-            maxRetryDelay: const Duration(milliseconds: 1500),
-            enableJitter: false,
-          ),
-          equals(const Duration(milliseconds: 1500)),
-        );
-        expect(
-          AiService.calculateExponentialBackoff(
-            attempt: 4,
-            initialRetryDelay: const Duration(milliseconds: 500),
-            maxRetryDelay: const Duration(milliseconds: 1500),
-            enableJitter: false,
-          ),
-          equals(const Duration(milliseconds: 1500)),
-        );
-        expect(
-          AiService.calculateExponentialBackoff(
-            attempt: 65,
-            initialRetryDelay: const Duration(milliseconds: 500),
-            maxRetryDelay: const Duration(seconds: 15),
-            enableJitter: false,
-          ),
-          equals(const Duration(seconds: 15)),
-        );
-        expect(
-          AiService.calculateExponentialBackoff(
-            attempt: 100,
-            initialRetryDelay: const Duration(milliseconds: 500),
-            maxRetryDelay: const Duration(seconds: 15),
-            enableJitter: false,
-          ),
-          equals(const Duration(seconds: 15)),
-        );
-      },
-    );
+        'clamps backoff at maxRetryDelay and bit-shift overflow immunity with large attempts',
+        () {
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 3,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(milliseconds: 1500),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 1500)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 4,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(milliseconds: 1500),
+          enableJitter: false,
+        ),
+        equals(const Duration(milliseconds: 1500)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 65,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(seconds: 15)),
+      );
+      expect(
+        AiService.calculateExponentialBackoff(
+          attempt: 100,
+          initialRetryDelay: const Duration(milliseconds: 500),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: false,
+        ),
+        equals(const Duration(seconds: 15)),
+      );
+    });
 
     test('returns Duration.zero for 0ms initial or max delay', () {
       expect(
@@ -378,41 +377,40 @@ void main() {
     });
 
     test(
-      'applies jitter within +/-25% bounds (up to +/-1000ms) and enforces floor',
-      () {
-        for (int i = 0; i < 20; i++) {
-          final backoff = AiService.calculateExponentialBackoff(
-            attempt: 1,
-            initialRetryDelay: const Duration(milliseconds: 1000),
-            maxRetryDelay: const Duration(seconds: 15),
-            enableJitter: true,
-          );
-          expect(backoff.inMilliseconds, greaterThanOrEqualTo(750));
-          expect(backoff.inMilliseconds, lessThanOrEqualTo(1250));
-        }
+        'applies jitter within +/-25% bounds (up to +/-1000ms) and enforces floor',
+        () {
+      for (int i = 0; i < 20; i++) {
+        final backoff = AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 1000),
+          maxRetryDelay: const Duration(seconds: 15),
+          enableJitter: true,
+        );
+        expect(backoff.inMilliseconds, greaterThanOrEqualTo(750));
+        expect(backoff.inMilliseconds, lessThanOrEqualTo(1250));
+      }
 
-        for (int i = 0; i < 20; i++) {
-          final backoff = AiService.calculateExponentialBackoff(
-            attempt: 1,
-            initialRetryDelay: const Duration(milliseconds: 10000),
-            maxRetryDelay: const Duration(seconds: 20),
-            enableJitter: true,
-          );
-          expect(backoff.inMilliseconds, greaterThanOrEqualTo(9000));
-          expect(backoff.inMilliseconds, lessThanOrEqualTo(11000));
-        }
+      for (int i = 0; i < 20; i++) {
+        final backoff = AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 10000),
+          maxRetryDelay: const Duration(seconds: 20),
+          enableJitter: true,
+        );
+        expect(backoff.inMilliseconds, greaterThanOrEqualTo(9000));
+        expect(backoff.inMilliseconds, lessThanOrEqualTo(11000));
+      }
 
-        for (int i = 0; i < 20; i++) {
-          final backoff = AiService.calculateExponentialBackoff(
-            attempt: 1,
-            initialRetryDelay: const Duration(milliseconds: 1),
-            maxRetryDelay: const Duration(seconds: 5),
-            enableJitter: true,
-          );
-          expect(backoff.inMilliseconds, greaterThanOrEqualTo(1));
-        }
-      },
-    );
+      for (int i = 0; i < 20; i++) {
+        final backoff = AiService.calculateExponentialBackoff(
+          attempt: 1,
+          initialRetryDelay: const Duration(milliseconds: 1),
+          maxRetryDelay: const Duration(seconds: 5),
+          enableJitter: true,
+        );
+        expect(backoff.inMilliseconds, greaterThanOrEqualTo(1));
+      }
+    });
 
     test('produces deterministic output with seeded random', () {
       final backoff1 = AiService.calculateExponentialBackoff(
@@ -433,29 +431,28 @@ void main() {
     });
 
     test(
-      'produces symmetric jitter range reaching both -jitterRange and +jitterRange',
-      () {
-        // 1000ms delay yields jitterRange = 250ms (+/-25%)
-        // Range of rnd.nextInt(jitterRange * 2 + 1) is 0 to 500
-        final minBackoff = AiService.calculateExponentialBackoff(
-          attempt: 1,
-          initialRetryDelay: const Duration(milliseconds: 1000),
-          maxRetryDelay: const Duration(seconds: 15),
-          enableJitter: true,
-          random: _FixedRandom(0),
-        );
-        final maxBackoff = AiService.calculateExponentialBackoff(
-          attempt: 1,
-          initialRetryDelay: const Duration(milliseconds: 1000),
-          maxRetryDelay: const Duration(seconds: 15),
-          enableJitter: true,
-          random: _FixedRandom(500),
-        );
+        'produces symmetric jitter range reaching both -jitterRange and +jitterRange',
+        () {
+      // 1000ms delay yields jitterRange = 250ms (+/-25%)
+      // Range of rnd.nextInt(jitterRange * 2 + 1) is 0 to 500
+      final minBackoff = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: _FixedRandom(0),
+      );
+      final maxBackoff = AiService.calculateExponentialBackoff(
+        attempt: 1,
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: true,
+        random: _FixedRandom(500),
+      );
 
-        expect(minBackoff, equals(const Duration(milliseconds: 750)));
-        expect(maxBackoff, equals(const Duration(milliseconds: 1250)));
-      },
-    );
+      expect(minBackoff, equals(const Duration(milliseconds: 750)));
+      expect(maxBackoff, equals(const Duration(milliseconds: 1250)));
+    });
   });
 
   group('AiServiceJsonExtension.generateJson Tests', () {
@@ -546,13 +543,12 @@ void main() {
     });
 
     test(
-      'instantiates MethodChannelAiService when defaultTargetPlatform is Android',
-      () {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        final service = getAiService();
-        expect(service, isA<MethodChannelAiService>());
-      },
-    );
+        'instantiates MethodChannelAiService when defaultTargetPlatform is Android',
+        () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final service = getAiService();
+      expect(service, isA<MethodChannelAiService>());
+    });
 
     test('instantiates MockAiService as fallback on non-Android platforms', () {
       debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
@@ -572,12 +568,10 @@ void main() {
     });
 
     test(
-      'getWebAiService throws UnsupportedError when invoked on non-Web platform',
-      () {
-        expect(() => getWebAiService(), throwsA(isA<UnsupportedError>()));
-      },
-      skip: kIsWeb,
-    );
+        'getWebAiService throws UnsupportedError when invoked on non-Web platform',
+        () {
+      expect(() => getWebAiService(), throwsA(isA<UnsupportedError>()));
+    }, skip: kIsWeb);
   });
 
   group('aiServiceProvider Tests', () {
@@ -592,48 +586,46 @@ void main() {
 
   group('MockAiService Tests', () {
     test(
-      'triggerDownload with configurable downloadDelay transitions status to downloading and then available',
-      () {
-        fakeAsync((async) {
-          final service = MockAiService(
-            downloadDelay: const Duration(milliseconds: 10),
-          );
-          service.setMockStatus(AiCoreStatus.downloadable);
-          expect(
-            service.checkStatus(),
-            completion(equals(AiCoreStatus.downloadable)),
-          );
-          async.flushMicrotasks();
+        'triggerDownload with configurable downloadDelay transitions status to downloading and then available',
+        () {
+      fakeAsync((async) {
+        final service = MockAiService(
+          downloadDelay: const Duration(milliseconds: 10),
+        );
+        service.setMockStatus(AiCoreStatus.downloadable);
+        expect(
+          service.checkStatus(),
+          completion(equals(AiCoreStatus.downloadable)),
+        );
+        async.flushMicrotasks();
 
-          final future = service.triggerDownload();
-          expect(async.elapsed, equals(Duration.zero));
-          expect(
-            service.checkStatus(),
-            completion(equals(AiCoreStatus.downloading)),
-          );
-          async.flushMicrotasks();
+        final future = service.triggerDownload();
+        expect(async.elapsed, equals(Duration.zero));
+        expect(
+          service.checkStatus(),
+          completion(equals(AiCoreStatus.downloading)),
+        );
+        async.flushMicrotasks();
 
-          async.elapse(const Duration(milliseconds: 10));
-          expect(future, completes);
-          expect(
-            service.checkStatus(),
-            completion(equals(AiCoreStatus.available)),
-          );
-          async.flushMicrotasks();
-        });
-      },
-    );
+        async.elapse(const Duration(milliseconds: 10));
+        expect(future, completes);
+        expect(
+          service.checkStatus(),
+          completion(equals(AiCoreStatus.available)),
+        );
+        async.flushMicrotasks();
+      });
+    });
 
     test(
-      'triggerDownload with zero downloadDelay transitions status to available when awaited',
-      () async {
-        final service = MockAiService(downloadDelay: Duration.zero);
-        service.setMockStatus(AiCoreStatus.downloadable);
+        'triggerDownload with zero downloadDelay transitions status to available when awaited',
+        () async {
+      final service = MockAiService(downloadDelay: Duration.zero);
+      service.setMockStatus(AiCoreStatus.downloadable);
 
-        await service.triggerDownload();
-        expect(await service.checkStatus(), equals(AiCoreStatus.available));
-      },
-    );
+      await service.triggerDownload();
+      expect(await service.checkStatus(), equals(AiCoreStatus.available));
+    });
 
     test(
       'triggerDownload does nothing when status is not downloadable',
@@ -652,54 +644,50 @@ void main() {
     });
 
     test(
-      'dispose executes safely when called polymorphically on AiService reference to MockAiService',
-      () {
-        final AiService service = MockAiService();
-        expect(() => service.dispose(), returnsNormally);
-      },
-    );
+        'dispose executes safely when called polymorphically on AiService reference to MockAiService',
+        () {
+      final AiService service = MockAiService();
+      expect(() => service.dispose(), returnsNormally);
+    });
   });
 
   group('AiServiceContinuationExtension Tests', () {
     test(
-      'generateContentWithContinuation returns raw text directly when autoContinueLimit <= 0',
-      () async {
-        final service = TestFakeAiService()..mockContent = 'Simple content';
-        final text = await service.generateContentWithContinuation(
-          prompt: 'test prompt',
-          autoContinueLimit: 0,
-        );
-        expect(text, equals('Simple content'));
-      },
-    );
+        'generateContentWithContinuation returns raw text directly when autoContinueLimit <= 0',
+        () async {
+      final service = TestFakeAiService()..mockContent = 'Simple content';
+      final text = await service.generateContentWithContinuation(
+        prompt: 'test prompt',
+        autoContinueLimit: 0,
+      );
+      expect(text, equals('Simple content'));
+    });
 
     test(
-      'generateContentWithContinuation handles negative autoContinueLimit values (e.g. -1)',
-      () async {
-        final service = TestFakeAiService()..mockContent = 'Simple content';
-        final text = await service.generateContentWithContinuation(
-          prompt: 'test prompt',
-          autoContinueLimit: -1,
-        );
-        expect(text, equals('Simple content'));
-      },
-    );
+        'generateContentWithContinuation handles negative autoContinueLimit values (e.g. -1)',
+        () async {
+      final service = TestFakeAiService()..mockContent = 'Simple content';
+      final text = await service.generateContentWithContinuation(
+        prompt: 'test prompt',
+        autoContinueLimit: -1,
+      );
+      expect(text, equals('Simple content'));
+    });
 
     test(
-      'generateContentWithContinuation triggers auto-continuation loop when autoContinueLimit > 0',
-      () async {
-        final service = TestContinuationAiService([
-          AiResponse(text: 'Hello ', isTruncated: true),
-          AiResponse(text: 'world!', isTruncated: false),
-        ]);
+        'generateContentWithContinuation triggers auto-continuation loop when autoContinueLimit > 0',
+        () async {
+      final service = TestContinuationAiService([
+        AiResponse(text: 'Hello ', isTruncated: true),
+        AiResponse(text: 'world!', isTruncated: false),
+      ]);
 
-        final text = await service.generateContentWithContinuation(
-          prompt: 'continue prompt',
-          autoContinueLimit: 2,
-        );
-        expect(text, equals('Hello world!'));
-      },
-    );
+      final text = await service.generateContentWithContinuation(
+        prompt: 'continue prompt',
+        autoContinueLimit: 2,
+      );
+      expect(text, equals('Hello world!'));
+    });
 
     test(
       'forwards maxOutputTokens down through auto-continuation calls',
@@ -720,103 +708,97 @@ void main() {
     );
 
     test(
-      'returns null when generateContentRaw returns null (autoContinueLimit <= 0)',
-      () async {
-        final service = TestContinuationAiService([]);
-        final text = await service.generateContentWithContinuation(
-          prompt: 'null prompt',
-          autoContinueLimit: 0,
-        );
-        expect(text, isNull);
-      },
-    );
+        'returns null when generateContentRaw returns null (autoContinueLimit <= 0)',
+        () async {
+      final service = TestContinuationAiService([]);
+      final text = await service.generateContentWithContinuation(
+        prompt: 'null prompt',
+        autoContinueLimit: 0,
+      );
+      expect(text, isNull);
+    });
 
     test(
-      'returns null when generateContentRaw returns null (autoContinueLimit > 0)',
-      () async {
-        final service = TestContinuationAiService([]);
-        final text = await service.generateContentWithContinuation(
-          prompt: 'null prompt',
-          autoContinueLimit: 2,
-        );
-        expect(text, isNull);
-      },
-    );
+        'returns null when generateContentRaw returns null (autoContinueLimit > 0)',
+        () async {
+      final service = TestContinuationAiService([]);
+      final text = await service.generateContentWithContinuation(
+        prompt: 'null prompt',
+        autoContinueLimit: 2,
+      );
+      expect(text, isNull);
+    });
 
     test(
-      'halts auto-continuation loop when autoContinueLimit threshold is reached',
-      () async {
-        final service = TestContinuationAiService([
-          AiResponse(text: 'Alpha continuation, ', isTruncated: true),
-          AiResponse(text: 'Beta continuation, ', isTruncated: true),
-          AiResponse(text: 'Gamma continuation.', isTruncated: false),
-        ]);
+        'halts auto-continuation loop when autoContinueLimit threshold is reached',
+        () async {
+      final service = TestContinuationAiService([
+        AiResponse(text: 'Alpha continuation, ', isTruncated: true),
+        AiResponse(text: 'Beta continuation, ', isTruncated: true),
+        AiResponse(text: 'Gamma continuation.', isTruncated: false),
+      ]);
 
-        final text = await service.generateContentWithContinuation(
-          prompt: 'continue prompt',
-          autoContinueLimit: 1,
-        );
-        expect(service.callIndex, equals(2));
-        expect(text, equals('Alpha continuation, Beta continuation, '));
-      },
-    );
-
-    test(
-      'triggers auto-continuation loop when initial response text matches truncation heuristic even if isTruncated is false',
-      () async {
-        final service = TestContinuationAiService([
-          AiResponse(text: '{"items": ["first",', isTruncated: false),
-          AiResponse(text: ' "second"]}', isTruncated: false),
-        ]);
-
-        final text = await service.generateContentWithContinuation(
-          prompt: 'get items json',
-          autoContinueLimit: 2,
-        );
-        expect(text, equals('{"items": ["first", "second"]}'));
-        expect(service.callIndex, equals(2));
-      },
-    );
+      final text = await service.generateContentWithContinuation(
+        prompt: 'continue prompt',
+        autoContinueLimit: 1,
+      );
+      expect(service.callIndex, equals(2));
+      expect(text, equals('Alpha continuation, Beta continuation, '));
+    });
 
     test(
-      'returns error text immediately without continuing when generateContentRaw returns isError: true on first call',
-      () async {
-        final service = TestContinuationAiService([
-          AiResponse(
-            text: '{"error": "Web AI internal error"}',
-            isTruncated: false,
-            isError: true,
-          ),
-        ]);
+        'triggers auto-continuation loop when initial response text matches truncation heuristic even if isTruncated is false',
+        () async {
+      final service = TestContinuationAiService([
+        AiResponse(text: '{"items": ["first",', isTruncated: false),
+        AiResponse(text: ' "second"]}', isTruncated: false),
+      ]);
 
-        final text = await service.generateContentWithContinuation(
-          prompt: 'failing call',
-          autoContinueLimit: 3,
-        );
-        expect(text, equals('{"error": "Web AI internal error"}'));
-        expect(service.callIndex, equals(1));
-      },
-    );
+      final text = await service.generateContentWithContinuation(
+        prompt: 'get items json',
+        autoContinueLimit: 2,
+      );
+      expect(text, equals('{"items": ["first", "second"]}'));
+      expect(service.callIndex, equals(2));
+    });
 
     test(
-      'stops auto-continuation loop and returns accumulated text when subsequent call returns isError: true',
-      () async {
-        final service = TestContinuationAiService([
-          AiResponse(text: 'Part one of the message, ', isTruncated: true),
-          AiResponse(
-            text: '{"error": "Disconnected"}',
-            isTruncated: false,
-            isError: true,
-          ),
-        ]);
+        'returns error text immediately without continuing when generateContentRaw returns isError: true on first call',
+        () async {
+      final service = TestContinuationAiService([
+        AiResponse(
+          text: '{"error": "Web AI internal error"}',
+          isTruncated: false,
+          isError: true,
+        ),
+      ]);
 
-        final text = await service.generateContentWithContinuation(
-          prompt: 'continue until error',
-          autoContinueLimit: 3,
-        );
-        expect(text, equals('Part one of the message, '));
-        expect(service.callIndex, equals(2));
-      },
-    );
+      final text = await service.generateContentWithContinuation(
+        prompt: 'failing call',
+        autoContinueLimit: 3,
+      );
+      expect(text, equals('{"error": "Web AI internal error"}'));
+      expect(service.callIndex, equals(1));
+    });
+
+    test(
+        'stops auto-continuation loop and returns accumulated text when subsequent call returns isError: true',
+        () async {
+      final service = TestContinuationAiService([
+        AiResponse(text: 'Part one of the message, ', isTruncated: true),
+        AiResponse(
+          text: '{"error": "Disconnected"}',
+          isTruncated: false,
+          isError: true,
+        ),
+      ]);
+
+      final text = await service.generateContentWithContinuation(
+        prompt: 'continue until error',
+        autoContinueLimit: 3,
+      );
+      expect(text, equals('Part one of the message, '));
+      expect(service.callIndex, equals(2));
+    });
   });
 }

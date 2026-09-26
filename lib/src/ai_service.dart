@@ -35,11 +35,10 @@ class AiResponse {
     this.outputTokens,
     int? totalTokens,
     this.estimatedCostUsd,
-  }) : totalTokens =
-           totalTokens ??
-           (inputTokens != null && outputTokens != null
-               ? inputTokens + outputTokens
-               : null);
+  }) : totalTokens = totalTokens ??
+            (inputTokens != null && outputTokens != null
+                ? inputTokens + outputTokens
+                : null);
 }
 
 abstract class AiService {
@@ -89,9 +88,8 @@ abstract class AiService {
 
     final rnd = random ?? Random();
     final jitterRange = min(1000, (boundedMs * 0.25).round());
-    final jitter = jitterRange > 0
-        ? (rnd.nextInt(jitterRange * 2 + 1) - jitterRange)
-        : 0;
+    final jitter =
+        jitterRange > 0 ? (rnd.nextInt(jitterRange * 2 + 1) - jitterRange) : 0;
     final finalMs = max(1, boundedMs + jitter);
     return Duration(milliseconds: finalMs);
   }
