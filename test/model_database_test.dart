@@ -67,6 +67,40 @@ void main() {
       expect(geminiNames, isNot(contains('glm-4.7-flash')));
     });
 
+    test(
+        'CloudModelDatabase getAvailableModelNames maintains parity across all query filters',
+        () {
+      final filterCombinations = <(CloudProvider?, bool?)>[
+        (null, null),
+        (CloudProvider.gemini, null),
+        (CloudProvider.zhipu, null),
+        (null, true),
+        (null, false),
+        (CloudProvider.gemini, true),
+        (CloudProvider.gemini, false),
+        (CloudProvider.zhipu, true),
+        (CloudProvider.zhipu, false),
+      ];
+
+      for (final (provider, isVision) in filterCombinations) {
+        final expectedNames = CloudModelDatabase.getAvailableModels(
+          provider: provider,
+          isVision: isVision,
+        ).map((m) => m.modelName).toList();
+
+        final actualNames = CloudModelDatabase.getAvailableModelNames(
+          provider: provider,
+          isVision: isVision,
+        );
+
+        expect(
+          actualNames,
+          equals(expectedNames),
+          reason: 'Mismatch for provider=$provider, isVision=$isVision',
+        );
+      }
+    });
+
     test('CloudModelDatabase getModelInfo retrieves details', () {
       final info37 = CloudModelDatabase.getModelInfo('gemini-3.7-flash');
       expect(info37, isNotNull);

@@ -14,7 +14,7 @@ class CloudModelDatabase {
     ...zhipuModels,
   ];
 
-  /// Pre-computed list of all supported model names across all providers.
+  /// Pre-computed unmodifiable list of all supported model names across all providers.
   static final List<String> allModelNames = List.unmodifiable(
     allModels.map((m) => m.modelName),
   );
@@ -50,6 +50,9 @@ class CloudModelDatabase {
   }
 
   /// Query model names, optionally filtering by provider and vision support.
+  ///
+  /// When called without filters ([provider] and [isVision] are `null`),
+  /// returns the cached unmodifiable [allModelNames] list.
   static List<String> getAvailableModelNames({
     CloudProvider? provider,
     bool? isVision,
