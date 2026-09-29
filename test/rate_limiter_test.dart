@@ -23,6 +23,7 @@ void main() {
         limiter.throttleBeforeRequest(10);
         expect(async.elapsed, equals(Duration.zero));
         expect(limiter.requestTimestamps.length, equals(1));
+        final firstRequestTime = limiter.requestTimestamps.single;
 
         limiter.throttleBeforeRequest(10);
         expect(limiter.requestTimestamps.length, equals(1));
@@ -34,9 +35,9 @@ void main() {
 
         // The second request should be throttled/delayed to enforce the 100ms interval
         expect(async.elapsed, equals(const Duration(milliseconds: 100)));
-        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.requestTimestamps.length, equals(1));
         expect(
-          limiter.requestTimestamps[1].difference(limiter.requestTimestamps[0]),
+          limiter.requestTimestamps.single.difference(firstRequestTime),
           equals(const Duration(milliseconds: 100)),
         );
       });
@@ -62,6 +63,7 @@ void main() {
         limiter.throttleBeforeRequest(10);
         expect(async.elapsed, equals(Duration.zero));
         expect(limiter.requestTimestamps.length, equals(1));
+        final firstRequestTime = limiter.requestTimestamps.single;
 
         limiter.throttleBeforeRequest(10);
         expect(limiter.requestTimestamps.length, equals(1));
@@ -72,9 +74,9 @@ void main() {
         async.elapse(const Duration(milliseconds: 100));
 
         expect(async.elapsed, equals(const Duration(milliseconds: 200)));
-        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.requestTimestamps.length, equals(1));
         expect(
-          limiter.requestTimestamps[1].difference(limiter.requestTimestamps[0]),
+          limiter.requestTimestamps.single.difference(firstRequestTime),
           equals(const Duration(milliseconds: 200)),
         );
       });
@@ -647,6 +649,7 @@ void main() {
         final unconfiguredInfo = CloudModelInfo(
           modelName: 'test-unconfigured-tpm-model',
           provider: CloudProvider.gemini,
+          limitRpm: 60,
           description: 'Test unconfigured TPM limit',
         );
 
@@ -680,6 +683,7 @@ void main() {
           final nonPositiveInfo = CloudModelInfo(
             modelName: 'test-non-positive-tpm-model',
             provider: CloudProvider.gemini,
+            limitRpm: 60,
             limitTpm: nonPositiveTpm,
             description: 'Test non-positive TPM limit',
           );
@@ -777,7 +781,8 @@ void main() {
       fakeAsync((async) {
         final clock = async.getClock(DateTime(2026, 1, 1));
 
-        // Case 1: limitRpm is null (e.g. Zhipu GLM models with RPS only, or unconfigured RPM)
+        // Case 1: limitRpm is null, limitRps is active
+        // Only the latest timestamp is retained (bounded queue size = 1) for RPS spacing.
         final noRpmInfo = CloudModelInfo(
           modelName: 'test-no-rpm-model',
           provider: CloudProvider.zhipu,
@@ -792,75 +797,96 @@ void main() {
           nowProvider: () => clock.now(),
         );
 
-        final oldTimestamp = clock.now().subtract(const Duration(minutes: 2));
-        final recentTimestamp = clock.now().subtract(
-              const Duration(seconds: 10),
-            );
+        // First request executes immediately
+        limiter.throttleBeforeRequest(50);
+        expect(async.elapsed, equals(Duration.zero));
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(limiter.requestTimestamps.last, equals(clock.now()));
 
-        limiter.recordRequestForTesting(oldTimestamp, tokenCount: 50);
-        limiter.recordRequestForTesting(recentTimestamp, tokenCount: 50);
+        // Second request is throttled by RPS (5 RPS -> 200ms)
+        limiter.throttleBeforeRequest(50);
+        async.elapse(const Duration(milliseconds: 200));
+        expect(async.elapsed, equals(const Duration(milliseconds: 200)));
 
-        expect(limiter.requestTimestamps.length, equals(2));
-        expect(limiter.tokenUsage.length, equals(2));
+        // Request timestamps queue remains bounded at length 1 (retaining only latest timestamp)
+        // rather than growing monotonically on every request.
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(limiter.requestTimestamps.last, equals(clock.now()));
 
-        limiter.throttleBeforeRequest(20);
+        // Repeated subsequent requests verify queue does not grow monotonically
+        for (int i = 0; i < 5; i++) {
+          limiter.throttleBeforeRequest(50);
+          async.elapse(const Duration(milliseconds: 200));
+          expect(limiter.requestTimestamps.length, equals(1));
+          expect(limiter.requestTimestamps.last, equals(clock.now()));
+        }
 
-        // Old request timestamp is NOT pruned because limitRpm is null;
-        // but old token usage IS pruned because limitTpm is configured (> 0).
-        expect(limiter.requestTimestamps.length, equals(3));
-        expect(limiter.requestTimestamps.contains(oldTimestamp), isTrue);
-        expect(limiter.requestTimestamps.contains(recentTimestamp), isTrue);
-        expect(limiter.requestTimestamps.contains(clock.now()), isTrue);
+        // Token usage continues sliding-window tracking and pruning independently
+        expect(limiter.tokenUsage.length, equals(7));
+        expect(limiter.runningTokenSum, equals(350));
 
-        expect(limiter.tokenUsage.length, equals(2));
-        expect(
-          limiter.tokenUsage.any((item) => item.timestamp == oldTimestamp),
-          isFalse,
-        );
-        expect(
-          limiter.tokenUsage.any((item) => item.timestamp == recentTimestamp),
-          isTrue,
-        );
+        async.elapse(const Duration(minutes: 2));
+        limiter.throttleBeforeRequest(50);
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(limiter.tokenUsage.length, equals(1));
+        expect(limiter.runningTokenSum, equals(50));
 
-        // Case 2: limitRpm is 0 or negative
-        for (final nonPositiveRpm in [0, -10]) {
-          final nonPosInfo = CloudModelInfo(
-            modelName: 'test-non-positive-rpm-model',
+        // Case 2: Neither RPM nor RPS is active (limitRpm null or non-positive, no limitRps)
+        // Request timestamps are not used for rate limiting and queue remains empty to avoid allocations.
+        for (final nonPositiveRpm in [null, 0, -10]) {
+          final noPacingInfo = CloudModelInfo(
+            modelName: 'test-no-pacing-model',
             provider: CloudProvider.gemini,
             limitRpm: nonPositiveRpm,
-            description: 'Test non-positive RPM limit',
+            limitTpm: 1000,
+            description: 'Test model without RPM or RPS limit',
           );
 
-          final nonPosLimiter = RateLimiter(
-            modelInfo: nonPosInfo,
+          final noPacingLimiter = RateLimiter(
+            modelInfo: noPacingInfo,
             throttlePercentage: 100.0,
             nowProvider: () => clock.now(),
           );
 
-          final oldTime = clock.now().subtract(const Duration(minutes: 5));
-          nonPosLimiter.recordRequestForTesting(oldTime);
-          expect(nonPosLimiter.requestTimestamps.length, equals(1));
+          for (int i = 0; i < 5; i++) {
+            noPacingLimiter.throttleBeforeRequest(20);
+          }
 
-          nonPosLimiter.throttleBeforeRequest(10);
-          expect(nonPosLimiter.requestTimestamps.length, equals(2));
-          expect(nonPosLimiter.requestTimestamps.contains(oldTime), isTrue);
+          expect(noPacingLimiter.requestTimestamps.isEmpty, isTrue);
+          expect(noPacingLimiter.tokenUsage.length, equals(5));
         }
 
-        // Case 3: throttlePercentage <= 0.0 with limitRpm null preserves timestamps
+        // Case 3: throttlePercentage <= 0.0 with limitRpm null keeps request timestamps bounded
         final zeroThrottleLimiter = RateLimiter(
           modelInfo: noRpmInfo,
           throttlePercentage: 0.0,
           nowProvider: () => clock.now(),
         );
 
-        final oldTimeZero = clock.now().subtract(const Duration(minutes: 3));
-        zeroThrottleLimiter.recordRequestForTesting(oldTimeZero);
-        zeroThrottleLimiter.throttleBeforeRequest(10);
-        expect(zeroThrottleLimiter.requestTimestamps.length, equals(2));
-        expect(
-          zeroThrottleLimiter.requestTimestamps.contains(oldTimeZero),
-          isTrue,
+        for (int i = 0; i < 5; i++) {
+          zeroThrottleLimiter.throttleBeforeRequest(10);
+          expect(zeroThrottleLimiter.requestTimestamps.length, equals(1));
+          expect(
+            zeroThrottleLimiter.requestTimestamps.last,
+            equals(clock.now()),
+          );
+        }
+
+        // When neither RPM nor RPS is active and throttlePercentage <= 0.0
+        final zeroThrottleNoPacingLimiter = RateLimiter(
+          modelInfo: CloudModelInfo(
+            modelName: 'test-zero-throttle-unconfigured',
+            provider: CloudProvider.gemini,
+            description: 'Test zero throttle unconfigured',
+          ),
+          throttlePercentage: 0.0,
+          nowProvider: () => clock.now(),
         );
+
+        for (int i = 0; i < 5; i++) {
+          zeroThrottleNoPacingLimiter.throttleBeforeRequest(10);
+        }
+        expect(zeroThrottleNoPacingLimiter.requestTimestamps.isEmpty, isTrue);
       });
     });
   });
