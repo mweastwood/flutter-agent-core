@@ -14,12 +14,16 @@ class CloudModelDatabase {
     ...zhipuModels,
   ];
 
+  /// Pre-computed list of all supported model names across all providers.
+  static final List<String> allModelNames = List.unmodifiable(
+    allModels.map((m) => m.modelName),
+  );
+
   static final Map<String, CloudModelInfo> _modelsMap = {
     for (final model in allModels) model.modelName: model,
   };
 
-  /// Query which models are available, optionally filtering by provider and vision support.
-  static List<CloudModelInfo> getAvailableModels({
+  static Iterable<CloudModelInfo> _queryModels({
     CloudProvider? provider,
     bool? isVision,
   }) {
@@ -34,7 +38,15 @@ class CloudModelDatabase {
     if (isVision != null) {
       list = list.where((m) => m.isVision == isVision);
     }
-    return list.toList();
+    return list;
+  }
+
+  /// Query which models are available, optionally filtering by provider and vision support.
+  static List<CloudModelInfo> getAvailableModels({
+    CloudProvider? provider,
+    bool? isVision,
+  }) {
+    return _queryModels(provider: provider, isVision: isVision).toList();
   }
 
   /// Query model names, optionally filtering by provider and vision support.
@@ -42,7 +54,10 @@ class CloudModelDatabase {
     CloudProvider? provider,
     bool? isVision,
   }) {
-    return getAvailableModels(
+    if (provider == null && isVision == null) {
+      return allModelNames;
+    }
+    return _queryModels(
       provider: provider,
       isVision: isVision,
     ).map((m) => m.modelName).toList();

@@ -12,6 +12,14 @@ void main() {
         CloudModelDatabase.allModels,
         equals([...kGeminiModels, ...kZhipuModels]),
       );
+      expect(
+        CloudModelDatabase.allModelNames,
+        equals(CloudModelDatabase.allModels.map((m) => m.modelName).toList()),
+      );
+      expect(
+        () => CloudModelDatabase.allModelNames.add('unsupported-model'),
+        throwsUnsupportedError,
+      );
       expect(kGeminiModels, isNotEmpty);
       expect(kZhipuModels, isNotEmpty);
     });
@@ -44,13 +52,16 @@ void main() {
 
     test('CloudModelDatabase getAvailableModelNames returns names', () {
       final allNames = CloudModelDatabase.getAvailableModelNames();
+      expect(identical(allNames, CloudModelDatabase.allModelNames), isTrue);
       expect(allNames, contains('gemini-3.7-flash'));
       expect(allNames, contains('gemini-3.5-flash'));
       expect(allNames, contains('glm-4.7-flash'));
+      expect(() => allNames.add('unsupported-model'), throwsUnsupportedError);
 
       final geminiNames = CloudModelDatabase.getAvailableModelNames(
         provider: CloudProvider.gemini,
       );
+      expect(identical(geminiNames, CloudModelDatabase.allModelNames), isFalse);
       expect(geminiNames, contains('gemini-3.7-flash'));
       expect(geminiNames, contains('gemini-3.5-flash'));
       expect(geminiNames, isNot(contains('glm-4.7-flash')));
