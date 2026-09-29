@@ -115,6 +115,7 @@ void main() {
         final mockInfo = CloudModelInfo(
           modelName: 'test-prune-model',
           provider: CloudProvider.gemini,
+          limitRpm: 60,
           limitTpm: 1000,
           description: 'Test limit',
         );
@@ -696,8 +697,14 @@ void main() {
         }
 
         // Case 4: pruneExpiredTokens is skipped when limitTpm is null
+        final rpmConfiguredInfo = CloudModelInfo(
+          modelName: 'test-rpm-configured-model',
+          provider: CloudProvider.gemini,
+          limitRpm: 60,
+          description: 'Test RPM configured with unconfigured TPM limit',
+        );
         final pruningSkipLimiter = RateLimiter(
-          modelInfo: unconfiguredInfo,
+          modelInfo: rpmConfiguredInfo,
           throttlePercentage: 100.0,
           nowProvider: () => clock.now(),
         );
@@ -761,6 +768,99 @@ void main() {
         expect(limiter.requestTimestamps.length, equals(2));
         expect(limiter.tokenUsage.isEmpty, isTrue);
         expect(limiter.runningTokenSum, equals(0));
+      });
+    });
+
+    test(
+        'RateLimiter skips sliding-window request pruning when limitRpm is null or non-positive',
+        () {
+      fakeAsync((async) {
+        final clock = async.getClock(DateTime(2026, 1, 1));
+
+        // Case 1: limitRpm is null (e.g. Zhipu GLM models with RPS only, or unconfigured RPM)
+        final noRpmInfo = CloudModelInfo(
+          modelName: 'test-no-rpm-model',
+          provider: CloudProvider.zhipu,
+          limitRps: 5,
+          limitTpm: 1000,
+          description: 'Test model with RPS and TPM only',
+        );
+
+        final limiter = RateLimiter(
+          modelInfo: noRpmInfo,
+          throttlePercentage: 100.0,
+          nowProvider: () => clock.now(),
+        );
+
+        final oldTimestamp = clock.now().subtract(const Duration(minutes: 2));
+        final recentTimestamp = clock.now().subtract(
+              const Duration(seconds: 10),
+            );
+
+        limiter.recordRequestForTesting(oldTimestamp, tokenCount: 50);
+        limiter.recordRequestForTesting(recentTimestamp, tokenCount: 50);
+
+        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.tokenUsage.length, equals(2));
+
+        limiter.throttleBeforeRequest(20);
+
+        // Old request timestamp is NOT pruned because limitRpm is null;
+        // but old token usage IS pruned because limitTpm is configured (> 0).
+        expect(limiter.requestTimestamps.length, equals(3));
+        expect(limiter.requestTimestamps.contains(oldTimestamp), isTrue);
+        expect(limiter.requestTimestamps.contains(recentTimestamp), isTrue);
+        expect(limiter.requestTimestamps.contains(clock.now()), isTrue);
+
+        expect(limiter.tokenUsage.length, equals(2));
+        expect(
+          limiter.tokenUsage.any((item) => item.timestamp == oldTimestamp),
+          isFalse,
+        );
+        expect(
+          limiter.tokenUsage.any((item) => item.timestamp == recentTimestamp),
+          isTrue,
+        );
+
+        // Case 2: limitRpm is 0 or negative
+        for (final nonPositiveRpm in [0, -10]) {
+          final nonPosInfo = CloudModelInfo(
+            modelName: 'test-non-positive-rpm-model',
+            provider: CloudProvider.gemini,
+            limitRpm: nonPositiveRpm,
+            description: 'Test non-positive RPM limit',
+          );
+
+          final nonPosLimiter = RateLimiter(
+            modelInfo: nonPosInfo,
+            throttlePercentage: 100.0,
+            nowProvider: () => clock.now(),
+          );
+
+          final oldTime = clock.now().subtract(const Duration(minutes: 5));
+          nonPosLimiter.recordRequestForTesting(oldTime);
+          expect(nonPosLimiter.requestTimestamps.length, equals(1));
+
+          nonPosLimiter.throttleBeforeRequest(10);
+          expect(nonPosLimiter.requestTimestamps.length, equals(2));
+          expect(nonPosLimiter.requestTimestamps.contains(oldTime), isTrue);
+        }
+
+        // Case 3: throttlePercentage <= 0.0 with limitRpm null preserves timestamps
+        final zeroThrottleLimiter = RateLimiter(
+          modelInfo: noRpmInfo,
+          throttlePercentage: 0.0,
+          nowProvider: () => clock.now(),
+        );
+
+        final oldTimeZero = clock.now().subtract(const Duration(minutes: 3));
+        zeroThrottleLimiter.recordRequestForTesting(oldTimeZero);
+        zeroThrottleLimiter.throttleBeforeRequest(10);
+        expect(zeroThrottleLimiter.requestTimestamps.length, equals(2));
+        expect(
+          zeroThrottleLimiter.requestTimestamps.contains(oldTimeZero),
+          isTrue,
+        );
       });
     });
   });

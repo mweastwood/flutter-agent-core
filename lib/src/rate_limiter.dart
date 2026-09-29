@@ -14,6 +14,7 @@ class RateLimiter {
   final CloudModelInfo modelInfo;
   final DateTime Function() _now;
   final bool _hasTpmLimit;
+  final bool _hasRpmLimit;
 
   final Queue<DateTime> _requestTimestamps = Queue<DateTime>();
   final Queue<({DateTime timestamp, int tokenCount})> _tokenUsage =
@@ -29,7 +30,8 @@ class RateLimiter {
     this.throttlePercentage = 100.0,
     DateTime Function()? nowProvider,
   })  : _now = nowProvider ?? DateTime.now,
-        _hasTpmLimit = modelInfo.limitTpm != null && modelInfo.limitTpm! > 0;
+        _hasTpmLimit = modelInfo.limitTpm != null && modelInfo.limitTpm! > 0,
+        _hasRpmLimit = modelInfo.limitRpm != null && modelInfo.limitRpm! > 0;
 
   @visibleForTesting
   List<DateTime> get requestTimestamps => List.unmodifiable(_requestTimestamps);
@@ -68,7 +70,9 @@ class RateLimiter {
 
   Future<void> throttleBeforeRequest(int estimatedTokens) async {
     final now = _now();
-    _pruneExpiredRequests(now, const Duration(minutes: 1));
+    if (_hasRpmLimit) {
+      _pruneExpiredRequests(now, const Duration(minutes: 1));
+    }
     if (_hasTpmLimit) {
       _pruneExpiredTokens(now, const Duration(minutes: 1));
     }
@@ -104,7 +108,7 @@ class RateLimiter {
       }
     }
 
-    if (modelInfo.limitRpm != null && modelInfo.limitRpm! > 0) {
+    if (_hasRpmLimit) {
       final double effectiveRpm = modelInfo.limitRpm! * pctFactor;
       while (true) {
         final checkTime = _now();
