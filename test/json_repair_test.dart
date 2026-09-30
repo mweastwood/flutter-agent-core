@@ -232,4 +232,148 @@ void main() {
       expect(jsonDecode(closedArrSingleTru), equals([]));
     });
   });
+
+  group('json_repair Batch Slicing & Code Unit Optimization Tests', () {
+    test('handles multi-kilobyte string literals with complex escapes', () {
+      final largeContent = 'a' * 10000 +
+          r'\"escaped_quote\"' +
+          r'\\escaped_backslash\\' +
+          r'\nmultiline\r\nline\tindented' +
+          'b' * 10000;
+      final rawJson = '{"content": "$largeContent"}';
+      final repaired = direct.repairJson(rawJson);
+      expect(repaired, equals(rawJson));
+      final decoded = jsonDecode(repaired) as Map<String, dynamic>;
+      expect(decoded['content'], contains('escaped_quote'));
+      expect(decoded['content'], contains(r'\escaped_backslash\'));
+      expect(decoded['content'], contains('multiline\r\nline\tindented'));
+    });
+
+    test('preserves raw unescaped newlines and tabs in large string literals',
+        () {
+      final xChunk = 'x' * 5000;
+      final yChunk = 'y' * 5000;
+      final rawContent = 'start\n$xChunk\n\tline2\n$yChunk';
+      final rawJson = '{"text": "$rawContent"}';
+      final repaired = direct.repairJson(rawJson);
+      expect(repaired, equals(rawJson));
+      expect(repaired.startsWith('{"text": "start\n'), isTrue);
+      expect(repaired.endsWith('"}'), isTrue);
+    });
+
+    test(
+        'repairs unclosed strings with and without dangling escape backslashes',
+        () {
+      // Unclosed string without trailing escape
+      final unclosed = direct.repairJson('{"message": "Hello world');
+      expect(unclosed, equals('{"message": "Hello world"}'));
+      expect(jsonDecode(unclosed), equals({'message': 'Hello world'}));
+
+      // Unclosed string with dangling single backslash
+      final danglingSlash = direct.repairJson(r'{"message": "Hello world\');
+      expect(danglingSlash, equals(r'{"message": "Hello world\\"}'));
+      expect(jsonDecode(danglingSlash), equals({'message': r'Hello world\'}));
+
+      // Unclosed string with escaped backslash then another dangling backslash
+      final tripleSlash = direct.repairJson(r'{"message": "Hello world\\\');
+      expect(tripleSlash, equals(r'{"message": "Hello world\\\\"}'));
+      expect(jsonDecode(tripleSlash), equals({'message': r'Hello world\\'}));
+
+      // Unclosed string with even backslashes (closed escape)
+      final evenSlash = direct.repairJson(r'{"message": "Hello world\\');
+      expect(evenSlash, equals(r'{"message": "Hello world\\"}'));
+      expect(jsonDecode(evenSlash), equals({'message': r'Hello world\'}));
+
+      // Unclosed string with escaped quote
+      final escapedQuote = direct.repairJson(r'{"message": "He said \"hello');
+      expect(escapedQuote, equals(r'{"message": "He said \"hello"}'));
+      expect(jsonDecode(escapedQuote), equals({'message': 'He said "hello'}));
+    });
+
+    test('batches contiguous whitespace runs across objects and arrays', () {
+      const whitespaceHeavy =
+          '  \t \r\n  {\r\n\t  "key"  \t :  \r\n  [  \n\t  1  ,  \t\r\n  2  \t  ]  \r\n  }  \t\r\n  ';
+      final repaired = direct.repairJson(whitespaceHeavy);
+      expect(repaired, equals(whitespaceHeavy));
+      expect(
+        jsonDecode(repaired),
+        equals({
+          'key': [1, 2],
+        }),
+      );
+
+      // Truncated with trailing whitespace
+      const truncatedWithWs = '  \t  {"items":   [  1,   2,   \t\r\n  ';
+      final repairedTruncated = direct.repairJson(truncatedWithWs);
+      expect(repairedTruncated, equals('  \t  {"items":   [  1,   2]}'));
+      expect(
+        jsonDecode(repairedTruncated),
+        equals({
+          'items': [1, 2],
+        }),
+      );
+    });
+
+    test(
+        'correctly parses primitive tokens flanked by delimiters and whitespace',
+        () {
+      const complexPrimitives =
+          '{"int": 42, "neg": -100, "float": 3.14159, "exp1": 1e-5, "exp2": 2.5E+3, "bool_t": true, "bool_f": false, "empty": null}';
+      final repaired = direct.repairJson(complexPrimitives);
+      expect(repaired, equals(complexPrimitives));
+      expect(
+        jsonDecode(repaired),
+        equals({
+          'int': 42,
+          'neg': -100,
+          'float': 3.14159,
+          'exp1': 1e-5,
+          'exp2': 2500.0,
+          'bool_t': true,
+          'bool_f': false,
+          'empty': null,
+        }),
+      );
+
+      // Primitive tokens in array without spaces
+      const arrayPrimitives = '[42,-100,3.14,1e5,true,false,null]';
+      final repairedArray = direct.repairJson(arrayPrimitives);
+      expect(repairedArray, equals(arrayPrimitives));
+      expect(
+        jsonDecode(repairedArray),
+        equals([42, -100, 3.14, 100000.0, true, false, null]),
+      );
+    });
+
+    test(
+        'truncates invalid or incomplete primitive literals rolling back to last complete entry',
+        () {
+      // Incomplete scientific notation
+      final incompExp = direct.repairJson('{"val": 1.2e+');
+      expect(incompExp, equals('{}'));
+
+      // Incomplete negative sign
+      final incompNeg = direct.repairJson('{"list": [10, -');
+      expect(incompNeg, equals('{"list": [10]}'));
+      expect(
+          jsonDecode(incompNeg),
+          equals({
+            'list': [10]
+          }));
+
+      // Malformed boolean with closing delimiter
+      final incompBoolClosed = direct.repairJson('{"a": 1, "flag": fal}');
+      expect(incompBoolClosed, equals('{"a": 1}'));
+      expect(jsonDecode(incompBoolClosed), equals({'a': 1}));
+
+      // Malformed boolean at EOF
+      final incompBoolEof = direct.repairJson('{"a": 1, "flag": fal');
+      expect(incompBoolEof, equals('{"a": 1}'));
+      expect(jsonDecode(incompBoolEof), equals({'a': 1}));
+
+      // Root level truncated literal
+      final rootTrunc = direct.repairJson('tru');
+      expect(rootTrunc, equals(''));
+    });
+  });
 }
