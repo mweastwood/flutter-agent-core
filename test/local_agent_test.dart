@@ -463,6 +463,94 @@ void main() {
       expect(delegate.counter, equals(1));
       expect(mockAi.callCount, equals(2));
     });
+
+    test('throws ArgumentError when maxSteps is 0', () async {
+      final mockAi = TestMockAiService([
+        {'action': 'increment', 'tool': 'inc'},
+      ]);
+      final delegate = MockTextAgentDelegate();
+      final harness = AgentHarness<TestStepResult>(
+        aiService: mockAi,
+        delegate: delegate,
+      );
+      bool onStepCalled = false;
+
+      await expectLater(
+        harness.runLoop(
+          userPrompt: 'test',
+          maxSteps: 0,
+          onStep: (result, step) => onStepCalled = true,
+        ),
+        throwsA(
+          isA<ArgumentError>()
+              .having((e) => e.name, 'name', equals('maxSteps'))
+              .having(
+                (e) => e.message,
+                'message',
+                contains('must be greater than 0'),
+              ),
+        ),
+      );
+      expect(mockAi.callCount, equals(0));
+      expect(delegate.actionsApplied, isEmpty);
+      expect(onStepCalled, isFalse);
+    });
+
+    test('throws ArgumentError when maxSteps is negative', () async {
+      final mockAi = TestMockAiService([
+        {'action': 'increment', 'tool': 'inc'},
+      ]);
+      final delegate = MockTextAgentDelegate();
+      final harness = AgentHarness<TestStepResult>(
+        aiService: mockAi,
+        delegate: delegate,
+      );
+      bool onStepCalled = false;
+
+      await expectLater(
+        harness.runLoop(
+          userPrompt: 'test',
+          maxSteps: -1,
+          onStep: (result, step) => onStepCalled = true,
+        ),
+        throwsA(
+          isA<ArgumentError>()
+              .having((e) => e.name, 'name', equals('maxSteps'))
+              .having(
+                (e) => e.message,
+                'message',
+                contains('must be greater than 0'),
+              ),
+        ),
+      );
+      expect(mockAi.callCount, equals(0));
+      expect(delegate.actionsApplied, isEmpty);
+      expect(onStepCalled, isFalse);
+    });
+
+    test('succeeds and executes exactly one step when maxSteps is 1', () async {
+      final mockAi = TestMockAiService([
+        {'action': 'increment', 'tool': 'inc'},
+        {'action': 'increment', 'tool': 'inc'},
+      ]);
+      final delegate = MockTextAgentDelegate();
+      final harness = AgentHarness<TestStepResult>(
+        aiService: mockAi,
+        delegate: delegate,
+      );
+
+      final steps = await harness.runLoop(
+        userPrompt: 'test boundary',
+        maxSteps: 1,
+      );
+
+      expect(steps.length, equals(1));
+      expect(mockAi.callCount, equals(1));
+      expect(delegate.counter, equals(1));
+      expect(delegate.actionsApplied, equals(['increment']));
+      expect(steps[0].tool, equals('inc'));
+      expect(steps[0].feedback, equals('Counter is now 1'));
+    });
   });
 
   group('AgentHistoryEntry Serialization Tests', () {

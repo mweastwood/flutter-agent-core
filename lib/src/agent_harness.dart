@@ -31,12 +31,22 @@ class AgentHarness<T> {
   AgentHarness({required this.aiService, required this.delegate});
 
   /// Runs the agent reasoning-action loop.
+  ///
+  /// Throws an [ArgumentError] if [maxSteps] is less than or equal to 0.
   Future<List<T>> runLoop({
     required String userPrompt,
     int maxSteps = 5,
     double temperature = 1.0,
     Function(T stepResult, int currentStep)? onStep,
   }) async {
+    if (maxSteps <= 0) {
+      throw ArgumentError.value(
+        maxSteps,
+        'maxSteps',
+        'must be greater than 0',
+      );
+    }
+
     final List<T> results = [];
 
     for (int step = 1; step <= maxSteps; step++) {
