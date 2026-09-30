@@ -473,9 +473,14 @@ void main() {
         aiService: mockAi,
         delegate: delegate,
       );
+      bool onStepCalled = false;
 
-      expect(
-        () => harness.runLoop(userPrompt: 'test', maxSteps: 0),
+      await expectLater(
+        harness.runLoop(
+          userPrompt: 'test',
+          maxSteps: 0,
+          onStep: (result, step) => onStepCalled = true,
+        ),
         throwsA(
           isA<ArgumentError>()
               .having((e) => e.name, 'name', equals('maxSteps'))
@@ -488,6 +493,7 @@ void main() {
       );
       expect(mockAi.callCount, equals(0));
       expect(delegate.actionsApplied, isEmpty);
+      expect(onStepCalled, isFalse);
     });
 
     test('throws ArgumentError when maxSteps is negative', () async {
@@ -499,9 +505,14 @@ void main() {
         aiService: mockAi,
         delegate: delegate,
       );
+      bool onStepCalled = false;
 
-      expect(
-        () => harness.runLoop(userPrompt: 'test', maxSteps: -1),
+      await expectLater(
+        harness.runLoop(
+          userPrompt: 'test',
+          maxSteps: -1,
+          onStep: (result, step) => onStepCalled = true,
+        ),
         throwsA(
           isA<ArgumentError>()
               .having((e) => e.name, 'name', equals('maxSteps'))
@@ -514,6 +525,7 @@ void main() {
       );
       expect(mockAi.callCount, equals(0));
       expect(delegate.actionsApplied, isEmpty);
+      expect(onStepCalled, isFalse);
     });
 
     test('succeeds and executes exactly one step when maxSteps is 1', () async {
@@ -2518,8 +2530,8 @@ void main() {
       // Edge case: Large overlaps (> 500 characters) should be capped at 500
       final longStr = 'a' * 600;
       expect(
-        stitchContinuation(longStr, '${'a' * 600}b'),
-        equals('${'a' * 700}b'),
+        stitchContinuation(longStr, 'a' * 600 + 'b'),
+        equals('a' * 700 + 'b'),
       );
 
       // Edge case: Empty or short strings
