@@ -12,6 +12,14 @@ void main() {
         CloudModelDatabase.allModels,
         equals([...kGeminiModels, ...kZhipuModels]),
       );
+      expect(
+        CloudModelDatabase.allModelNames,
+        equals(CloudModelDatabase.allModels.map((m) => m.modelName).toList()),
+      );
+      expect(
+        () => CloudModelDatabase.allModelNames.add('unsupported-model'),
+        throwsUnsupportedError,
+      );
       expect(kGeminiModels, isNotEmpty);
       expect(kZhipuModels, isNotEmpty);
     });
@@ -44,16 +52,53 @@ void main() {
 
     test('CloudModelDatabase getAvailableModelNames returns names', () {
       final allNames = CloudModelDatabase.getAvailableModelNames();
+      expect(identical(allNames, CloudModelDatabase.allModelNames), isTrue);
       expect(allNames, contains('gemini-3.7-flash'));
       expect(allNames, contains('gemini-3.5-flash'));
       expect(allNames, contains('glm-4.7-flash'));
+      expect(() => allNames.add('unsupported-model'), throwsUnsupportedError);
 
       final geminiNames = CloudModelDatabase.getAvailableModelNames(
         provider: CloudProvider.gemini,
       );
+      expect(identical(geminiNames, CloudModelDatabase.allModelNames), isFalse);
       expect(geminiNames, contains('gemini-3.7-flash'));
       expect(geminiNames, contains('gemini-3.5-flash'));
       expect(geminiNames, isNot(contains('glm-4.7-flash')));
+    });
+
+    test(
+        'CloudModelDatabase getAvailableModelNames maintains parity across all query filters',
+        () {
+      final filterCombinations = <(CloudProvider?, bool?)>[
+        (null, null),
+        (CloudProvider.gemini, null),
+        (CloudProvider.zhipu, null),
+        (null, true),
+        (null, false),
+        (CloudProvider.gemini, true),
+        (CloudProvider.gemini, false),
+        (CloudProvider.zhipu, true),
+        (CloudProvider.zhipu, false),
+      ];
+
+      for (final (provider, isVision) in filterCombinations) {
+        final expectedNames = CloudModelDatabase.getAvailableModels(
+          provider: provider,
+          isVision: isVision,
+        ).map((m) => m.modelName).toList();
+
+        final actualNames = CloudModelDatabase.getAvailableModelNames(
+          provider: provider,
+          isVision: isVision,
+        );
+
+        expect(
+          actualNames,
+          equals(expectedNames),
+          reason: 'Mismatch for provider=$provider, isVision=$isVision',
+        );
+      }
     });
 
     test('CloudModelDatabase getModelInfo retrieves details', () {
