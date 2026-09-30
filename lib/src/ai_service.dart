@@ -129,7 +129,11 @@ AiService getAiService() {
   return MockAiService();
 }
 
-final aiServiceProvider = Provider<AiService>((ref) => getAiService());
+final aiServiceProvider = Provider<AiService>((ref) {
+  final service = getAiService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
 extension AiServiceContinuationExtension on AiService {
   Future<String?> generateContentWithContinuation({

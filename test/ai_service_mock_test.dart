@@ -427,14 +427,18 @@ void main() {
     });
 
     group('dispose', () {
-      test('executes safely without errors', () {
+      test('executes safely without errors and sets isDisposed flag', () {
         final service = MockAiService();
+        expect(service.isDisposed, isFalse);
         expect(() => service.dispose(), returnsNormally);
+        expect(service.isDisposed, isTrue);
       });
 
-      test('executes safely via polymorphic AiService reference', () {
+      test('executes safely via polymorphic AiService reference and sets isDisposed flag', () {
         final AiService service = MockAiService();
+        expect((service as MockAiService).isDisposed, isFalse);
         expect(() => service.dispose(), returnsNormally);
+        expect((service as MockAiService).isDisposed, isTrue);
       });
     });
   });

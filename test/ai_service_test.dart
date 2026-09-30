@@ -596,6 +596,19 @@ void main() {
       final service = container.read(aiServiceProvider);
       expect(service, isA<AiService>());
     });
+
+    test(
+        'ref.onDispose automatically calls dispose on AiService when ProviderContainer is disposed',
+        () {
+      final container = ProviderContainer();
+      final service = container.read(aiServiceProvider);
+
+      expect(service, isA<MockAiService>());
+      expect((service as MockAiService).isDisposed, isFalse);
+
+      container.dispose();
+      expect(service.isDisposed, isTrue);
+    });
   });
 
   group('MockAiService Tests', () {
@@ -654,14 +667,18 @@ void main() {
 
     test('dispose executes safely without errors on MockAiService', () {
       final service = MockAiService();
+      expect(service.isDisposed, isFalse);
       expect(() => service.dispose(), returnsNormally);
+      expect(service.isDisposed, isTrue);
     });
 
     test(
         'dispose executes safely when called polymorphically on AiService reference to MockAiService',
         () {
       final AiService service = MockAiService();
+      expect((service as MockAiService).isDisposed, isFalse);
       expect(() => service.dispose(), returnsNormally);
+      expect((service as MockAiService).isDisposed, isTrue);
     });
   });
 
