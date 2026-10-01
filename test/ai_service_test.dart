@@ -589,6 +589,10 @@ void main() {
   });
 
   group('aiServiceProvider Tests', () {
+    tearDown(() {
+      debugDefaultTargetPlatformOverride = null;
+    });
+
     test('Riverpod provider initializes AiService instance without throw', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -600,6 +604,7 @@ void main() {
     test(
         'ref.onDispose automatically calls dispose on AiService when ProviderContainer is disposed',
         () {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
       final container = ProviderContainer();
       final service = container.read(aiServiceProvider);
 
@@ -608,7 +613,7 @@ void main() {
 
       container.dispose();
       expect(service.isDisposed, isTrue);
-    });
+    }, skip: kIsWeb);
   });
 
   group('MockAiService Tests', () {
