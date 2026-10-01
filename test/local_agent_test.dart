@@ -590,6 +590,25 @@ void main() {
     );
 
     test(
+      'forwards null imageBytes to aiService.generateContent when visualInput is omitted or null',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        await harness.runLoop(userPrompt: 'test null visual');
+
+        expect(mockAi.capturedImageBytes.length, equals(1));
+        expect(mockAi.capturedImageBytes.first, isNull);
+      },
+    );
+
+    test(
       'forwards custom temperature parameter to aiService.generateContent',
       () async {
         final mockAi = TestMockAiService([
@@ -717,6 +736,14 @@ void main() {
 
         expect(steps.length, equals(1));
         expect(steps[0].feedback, startsWith('Error: '));
+        expect(
+          steps[0].feedback,
+          anyOf(
+            contains('is not a subtype of type'),
+            contains('TypeError'),
+          ),
+        );
+        expect(steps[0].feedback, contains('Map<String, dynamic>'));
         expect(steps[0].isFinish, isFalse);
         expect(steps[0].tool, isEmpty);
         expect(delegate.actionsApplied, isEmpty);
