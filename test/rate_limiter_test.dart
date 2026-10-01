@@ -238,7 +238,8 @@ void main() {
           secondRequestCompleted = true;
         });
 
-        // Advance partially into the minute window; request should remain throttled
+        // Advance partially into the minute window; request should remain
+        // throttled.
         async.elapse(const Duration(seconds: 30));
         expect(secondRequestCompleted, isFalse);
         expect(limiter.tokenUsage.length, equals(1));
@@ -259,7 +260,9 @@ void main() {
         expect(limiter.tokenUsage.first.tokenCount, equals(600));
         expect(limiter.runningTokenSum, equals(600));
         expect(
-          limiter.tokenUsage.any((item) => item.timestamp == firstTokenTimestamp),
+          limiter.tokenUsage.any(
+            (item) => item.timestamp == firstTokenTimestamp,
+          ),
           isFalse,
         );
       });
