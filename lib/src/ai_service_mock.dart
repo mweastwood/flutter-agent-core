@@ -8,6 +8,9 @@ class MockAiService extends AiService {
   AiCoreStatus _status = AiCoreStatus.available;
   Future<void>? _activeDownloadFuture;
 
+  /// Tracks whether [dispose] has been called on this mock service.
+  bool isDisposed = false;
+
   /// Default delay for simulated download operations in [triggerDownload].
   ///
   /// Defaults to [Duration.zero] if not specified.
@@ -125,4 +128,10 @@ class MockAiService extends AiService {
     Uint8List? imageBytes,
   }) async =>
       AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
+
+  @override
+  void dispose() {
+    isDisposed = true;
+    super.dispose();
+  }
 }
