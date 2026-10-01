@@ -88,8 +88,7 @@ void main() {
         final mockInfo = CloudModelInfo(
           modelName: 'test-rpm-model',
           provider: CloudProvider.gemini,
-          limitRpm:
-              120, // 120 RPM -> 2 requests per second (500ms interval equivalent)
+          limitRpm: 2,
           description: 'Test limit',
         );
 
@@ -102,10 +101,35 @@ void main() {
         limiter.throttleBeforeRequest(10);
         limiter.throttleBeforeRequest(10);
 
-        // Enforces wait so requests fit within the minute rate limit
-        // With 120 RPM, the rate check passes immediately unless we exceed the 1-minute bucket.
         expect(async.elapsed, equals(Duration.zero));
         expect(limiter.requestTimestamps.length, equals(2));
+        final firstRequestTime = limiter.requestTimestamps.first;
+        final secondRequestTime = limiter.requestTimestamps.last;
+
+        var thirdRequestCompleted = false;
+        limiter.throttleBeforeRequest(10).then((_) {
+          thirdRequestCompleted = true;
+        });
+
+        // Advance partially into the minute window; request should remain throttled
+        async.elapse(const Duration(seconds: 30));
+        expect(thirdRequestCompleted, isFalse);
+        expect(limiter.requestTimestamps.length, equals(2));
+
+        // Advance past the 1-minute window + 100ms throttle buffer
+        async.elapse(const Duration(seconds: 30, milliseconds: 100));
+        expect(thirdRequestCompleted, isTrue);
+        expect(
+          async.elapsed,
+          equals(const Duration(seconds: 60, milliseconds: 100)),
+        );
+        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.requestTimestamps.contains(firstRequestTime), isFalse);
+        expect(limiter.requestTimestamps.first, equals(secondRequestTime));
+        expect(
+          limiter.requestTimestamps.last,
+          equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
+        );
       });
     });
 
