@@ -434,7 +434,9 @@ void main() {
         expect(service.isDisposed, isTrue);
       });
 
-      test('executes safely via polymorphic AiService reference and sets isDisposed flag', () {
+      test(
+          'executes safely via polymorphic AiService reference and sets isDisposed flag',
+          () {
         final AiService service = MockAiService();
         expect((service as MockAiService).isDisposed, isFalse);
         expect(() => service.dispose(), returnsNormally);
