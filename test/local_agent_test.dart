@@ -564,50 +564,52 @@ void main() {
     });
 
     test(
-        'forwards visualInput from delegate.getVisualInput to aiService.generateContent',
-        () async {
-      final imagePayload = Uint8List.fromList([1, 2, 3, 4, 5]);
-      final mockAi = TestMockAiService([
-        {'action': 'increment', 'tool': 'inc'},
-        {'action': 'stop', 'tool': 'finish'},
-      ]);
-      final delegate = MockTextAgentDelegate(visualInput: imagePayload);
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'forwards visualInput from delegate.getVisualInput to aiService.generateContent',
+      () async {
+        final imagePayload = Uint8List.fromList([1, 2, 3, 4, 5]);
+        final mockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate(visualInput: imagePayload);
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'test visual',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'test visual',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(2));
-      expect(mockAi.capturedImageBytes.length, equals(2));
-      expect(mockAi.capturedImageBytes[0], equals(imagePayload));
-      expect(mockAi.capturedImageBytes[1], equals(imagePayload));
-    });
+        expect(steps.length, equals(2));
+        expect(mockAi.capturedImageBytes.length, equals(2));
+        expect(mockAi.capturedImageBytes[0], equals(imagePayload));
+        expect(mockAi.capturedImageBytes[1], equals(imagePayload));
+      },
+    );
 
     test(
-        'forwards custom temperature parameter to aiService.generateContent',
-        () async {
-      final mockAi = TestMockAiService([
-        {'action': 'stop', 'tool': 'finish'},
-      ]);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'forwards custom temperature parameter to aiService.generateContent',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      await harness.runLoop(
-        userPrompt: 'test temperature',
-        temperature: 0.2,
-      );
+        await harness.runLoop(
+          userPrompt: 'test temperature',
+          temperature: 0.2,
+        );
 
-      expect(mockAi.capturedTemperatures.length, equals(1));
-      expect(mockAi.capturedTemperatures.first, equals(0.2));
-    });
+        expect(mockAi.capturedTemperatures.length, equals(1));
+        expect(mockAi.capturedTemperatures.first, equals(0.2));
+      },
+    );
 
     test('strips markdown code fences wrapping model action JSON', () async {
       const fencedJson = '''
@@ -648,53 +650,55 @@ void main() {
     });
 
     test(
-        'handles non-Map JSON response (TypeError on cast) and terminates with error step',
-        () async {
-      final mockAi = _RawStringMockAiService(['[{"action": "test"}]']);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'handles non-Map JSON response (TypeError on cast) and terminates with error step',
+      () async {
+        final mockAi = _RawStringMockAiService(['[{"action": "test"}]']);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'test non-map json',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'test non-map json',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(1));
-      expect(steps[0].feedback, startsWith('Error: type '));
-      expect(steps[0].feedback, contains('is not a subtype of type'));
-      expect(steps[0].feedback, contains('Map<String, dynamic>'));
-      expect(delegate.actionsApplied, isEmpty);
-      expect(mockAi.callCount, equals(1));
-    });
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, startsWith('Error: type '));
+        expect(steps[0].feedback, contains('is not a subtype of type'));
+        expect(steps[0].feedback, contains('Map<String, dynamic>'));
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
 
     test(
-        'terminates on step 1 when initial action is finish without invoking applyAction',
-        () async {
-      final mockAi = TestMockAiService([
-        {'action': 'stop', 'tool': 'finish'},
-        {'action': 'increment', 'tool': 'inc'},
-      ]);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'terminates on step 1 when initial action is finish without invoking applyAction',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+          {'action': 'increment', 'tool': 'inc'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'finish right away',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'finish right away',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(1));
-      expect(steps[0].tool, equals('finish'));
-      expect(steps[0].feedback, equals('Finished.'));
-      expect(steps[0].isFinish, isTrue);
-      expect(delegate.actionsApplied, isEmpty);
-      expect(mockAi.callCount, equals(1));
-    });
+        expect(steps.length, equals(1));
+        expect(steps[0].tool, equals('finish'));
+        expect(steps[0].feedback, equals('Finished.'));
+        expect(steps[0].isFinish, isTrue);
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
   });
 
   group('AgentHistoryEntry Serialization Tests', () {
