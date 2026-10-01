@@ -88,8 +88,7 @@ void main() {
         final mockInfo = CloudModelInfo(
           modelName: 'test-rpm-model',
           provider: CloudProvider.gemini,
-          limitRpm:
-              120, // 120 RPM -> 2 requests per second (500ms interval equivalent)
+          limitRpm: 2,
           description: 'Test limit',
         );
 
@@ -100,12 +99,103 @@ void main() {
         );
 
         limiter.throttleBeforeRequest(10);
-        limiter.throttleBeforeRequest(10);
+        expect(async.elapsed, equals(Duration.zero));
+        expect(limiter.requestTimestamps.length, equals(1));
+        final firstRequestTime = limiter.requestTimestamps.first;
+        expect(firstRequestTime, equals(DateTime(2026, 1, 1, 0, 0, 0)));
 
-        // Enforces wait so requests fit within the minute rate limit
-        // With 120 RPM, the rate check passes immediately unless we exceed the 1-minute bucket.
+        // Advance 20 seconds before dispatching the second request
+        async.elapse(const Duration(seconds: 20));
+        limiter.throttleBeforeRequest(10);
+        expect(async.elapsed, equals(const Duration(seconds: 20)));
+        expect(limiter.requestTimestamps.length, equals(2));
+        final secondRequestTime = limiter.requestTimestamps.last;
+        expect(secondRequestTime, equals(DateTime(2026, 1, 1, 0, 0, 20)));
+
+        var thirdRequestCompleted = false;
+        limiter.throttleBeforeRequest(10).then((_) {
+          thirdRequestCompleted = true;
+        });
+
+        // Request should be blocked immediately upon dispatch
+        expect(thirdRequestCompleted, isFalse);
+
+        // Advance partially into the remaining wait window; request should remain throttled
+        async.elapse(const Duration(seconds: 20));
+        expect(async.elapsed, equals(const Duration(seconds: 40)));
+        expect(thirdRequestCompleted, isFalse);
+        expect(limiter.requestTimestamps.length, equals(2));
+
+        // Advance past the 1-minute window of the first request + 100ms throttle buffer
+        async.elapse(const Duration(seconds: 20, milliseconds: 100));
+        expect(thirdRequestCompleted, isTrue);
+        expect(
+          async.elapsed,
+          equals(const Duration(seconds: 60, milliseconds: 100)),
+        );
+        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.requestTimestamps.contains(firstRequestTime), isFalse);
+        expect(limiter.requestTimestamps.first, equals(secondRequestTime));
+        expect(
+          limiter.requestTimestamps.last,
+          equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
+        );
+      });
+    });
+
+    test(
+        'RateLimiter handles back-to-back burst at t=0 and prunes co-expiring timestamps',
+        () {
+      fakeAsync((async) {
+        final clock = async.getClock(DateTime(2026, 1, 1));
+        final mockInfo = CloudModelInfo(
+          modelName: 'test-rpm-burst-model',
+          provider: CloudProvider.gemini,
+          limitRpm: 2,
+          description: 'Test limit',
+        );
+
+        final limiter = RateLimiter(
+          modelInfo: mockInfo,
+          throttlePercentage: 100.0,
+          nowProvider: () => clock.now(),
+        );
+
+        // Dispatches 2 requests at t=0 filling capacity immediately
+        limiter.throttleBeforeRequest(10);
+        limiter.throttleBeforeRequest(10);
         expect(async.elapsed, equals(Duration.zero));
         expect(limiter.requestTimestamps.length, equals(2));
+
+        var thirdRequestCompleted = false;
+        limiter.throttleBeforeRequest(10).then((_) {
+          thirdRequestCompleted = true;
+        });
+
+        // The 3rd request should be blocked immediately
+        expect(thirdRequestCompleted, isFalse);
+
+        // Advance partially into the 1-minute window (30s)
+        async.elapse(const Duration(seconds: 30));
+        expect(async.elapsed, equals(const Duration(seconds: 30)));
+        expect(thirdRequestCompleted, isFalse);
+        expect(limiter.requestTimestamps.length, equals(2));
+
+        // Advance past the 1-minute window + 100ms buffer
+        async.elapse(const Duration(seconds: 30, milliseconds: 100));
+        expect(thirdRequestCompleted, isTrue);
+        expect(
+          async.elapsed,
+          equals(const Duration(seconds: 60, milliseconds: 100)),
+        );
+
+        // Both initial requests at t=0 have expired (>1 min) and are pruned,
+        // leaving only the 3rd request in the queue.
+        expect(limiter.requestTimestamps.length, equals(1));
+        expect(
+          limiter.requestTimestamps.single,
+          equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
+        );
       });
     });
 
