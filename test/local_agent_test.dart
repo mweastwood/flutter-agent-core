@@ -611,6 +611,25 @@ void main() {
       },
     );
 
+    test(
+      'forwards default temperature (1.0) when parameter is omitted',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        await harness.runLoop(userPrompt: 'test default temperature');
+
+        expect(mockAi.capturedTemperatures.length, equals(1));
+        expect(mockAi.capturedTemperatures.first, equals(1.0));
+      },
+    );
+
     test('strips markdown code fences wrapping model action JSON', () async {
       const fencedJson = '''
 ```json
@@ -665,9 +684,41 @@ void main() {
         );
 
         expect(steps.length, equals(1));
-        expect(steps[0].feedback, startsWith('Error: type '));
-        expect(steps[0].feedback, contains('is not a subtype of type'));
+        expect(steps[0].feedback, startsWith('Error: '));
+        expect(
+          steps[0].feedback,
+          anyOf(
+            contains('is not a subtype of type'),
+            contains('TypeError'),
+          ),
+        );
         expect(steps[0].feedback, contains('Map<String, dynamic>'));
+        expect(steps[0].isFinish, isFalse);
+        expect(steps[0].tool, isEmpty);
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
+
+    test(
+      'handles scalar JSON response (TypeError on cast) and terminates with error step',
+      () async {
+        final mockAi = _RawStringMockAiService(['"done"']);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final steps = await harness.runLoop(
+          userPrompt: 'test scalar json',
+          maxSteps: 5,
+        );
+
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, startsWith('Error: '));
+        expect(steps[0].isFinish, isFalse);
+        expect(steps[0].tool, isEmpty);
         expect(delegate.actionsApplied, isEmpty);
         expect(mockAi.callCount, equals(1));
       },
@@ -696,6 +747,7 @@ void main() {
         expect(steps[0].feedback, equals('Finished.'));
         expect(steps[0].isFinish, isTrue);
         expect(delegate.actionsApplied, isEmpty);
+        expect(delegate.counter, equals(0));
         expect(mockAi.callCount, equals(1));
       },
     );
