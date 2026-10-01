@@ -440,7 +440,7 @@ void main() {
         final AiService service = MockAiService();
         expect((service as MockAiService).isDisposed, isFalse);
         expect(() => service.dispose(), returnsNormally);
-        expect((service as MockAiService).isDisposed, isTrue);
+        expect(service.isDisposed, isTrue);
       });
     });
   });
