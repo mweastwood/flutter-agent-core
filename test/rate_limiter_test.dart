@@ -217,7 +217,7 @@ void main() {
         final mockInfo = CloudModelInfo(
           modelName: 'test-tpm-model',
           provider: CloudProvider.gemini,
-          limitTpm: 100000,
+          limitTpm: 1000,
           description: 'Test limit',
         );
 
@@ -227,11 +227,44 @@ void main() {
           nowProvider: () => clock.now(),
         );
 
-        limiter.throttleBeforeRequest(500);
-        limiter.throttleBeforeRequest(500);
-
+        limiter.throttleBeforeRequest(600);
         expect(async.elapsed, equals(Duration.zero));
-        expect(limiter.tokenUsage.length, equals(2));
+        expect(limiter.tokenUsage.length, equals(1));
+        expect(limiter.runningTokenSum, equals(600));
+        final firstTokenTimestamp = limiter.tokenUsage.first.timestamp;
+
+        var secondRequestCompleted = false;
+        limiter.throttleBeforeRequest(600).then((_) {
+          secondRequestCompleted = true;
+        });
+
+        // Advance partially into the minute window; request should remain
+        // throttled.
+        async.elapse(const Duration(seconds: 30));
+        expect(secondRequestCompleted, isFalse);
+        expect(limiter.tokenUsage.length, equals(1));
+        expect(limiter.runningTokenSum, equals(600));
+
+        // Advance past the 1-minute window + 100ms throttle buffer
+        async.elapse(const Duration(seconds: 30, milliseconds: 100));
+        expect(secondRequestCompleted, isTrue);
+        expect(
+          async.elapsed,
+          equals(const Duration(seconds: 60, milliseconds: 100)),
+        );
+        expect(limiter.tokenUsage.length, equals(1));
+        expect(
+          limiter.tokenUsage.first.timestamp,
+          equals(DateTime(2026, 1, 1, 0, 1, 0, 100)),
+        );
+        expect(limiter.tokenUsage.first.tokenCount, equals(600));
+        expect(limiter.runningTokenSum, equals(600));
+        expect(
+          limiter.tokenUsage.any(
+            (item) => item.timestamp == firstTokenTimestamp,
+          ),
+          isFalse,
+        );
       });
     });
 
