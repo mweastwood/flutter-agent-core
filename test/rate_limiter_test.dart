@@ -99,11 +99,14 @@ void main() {
         );
 
         limiter.throttleBeforeRequest(10);
-        limiter.throttleBeforeRequest(10);
-
         expect(async.elapsed, equals(Duration.zero));
-        expect(limiter.requestTimestamps.length, equals(2));
+        expect(limiter.requestTimestamps.length, equals(1));
         final firstRequestTime = limiter.requestTimestamps.first;
+
+        // Advance 20 seconds before dispatching the second request
+        async.elapse(const Duration(seconds: 20));
+        limiter.throttleBeforeRequest(10);
+        expect(limiter.requestTimestamps.length, equals(2));
         final secondRequestTime = limiter.requestTimestamps.last;
 
         var thirdRequestCompleted = false;
@@ -111,13 +114,13 @@ void main() {
           thirdRequestCompleted = true;
         });
 
-        // Advance partially into the minute window; request should remain throttled
-        async.elapse(const Duration(seconds: 30));
+        // Advance partially into the remaining wait window; request should remain throttled
+        async.elapse(const Duration(seconds: 20));
         expect(thirdRequestCompleted, isFalse);
         expect(limiter.requestTimestamps.length, equals(2));
 
-        // Advance past the 1-minute window + 100ms throttle buffer
-        async.elapse(const Duration(seconds: 30, milliseconds: 100));
+        // Advance past the 1-minute window of the first request + 100ms throttle buffer
+        async.elapse(const Duration(seconds: 20, milliseconds: 100));
         expect(thirdRequestCompleted, isTrue);
         expect(
           async.elapsed,
