@@ -2636,6 +2636,81 @@ void main() {
       expect(service.countedPrompts[0], equals(promptText));
       expect(service.countedPrompts[1], equals('AI text response'));
     });
+
+    test('retryableStatusCodes contains expected retryable status codes', () {
+      expect(
+        CloudAiService.retryableStatusCodes,
+        containsAll(<int>[429, 500, 502, 503, 504]),
+      );
+      expect(CloudAiService.retryableStatusCodes.length, equals(5));
+      expect(CloudAiService.retryableStatusCodes.contains(400), isFalse);
+      expect(CloudAiService.retryableStatusCodes.contains(401), isFalse);
+      expect(CloudAiService.retryableStatusCodes.contains(403), isFalse);
+      expect(CloudAiService.retryableStatusCodes.contains(404), isFalse);
+      expect(CloudAiService.retryableStatusCodes.contains(200), isFalse);
+    });
+
+    test('buildRequestBody correctly formats text-only messages', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+      );
+
+      final bodyJson = service.buildRequestBody(
+        prompt: 'Test prompt without image',
+        temperature: 0.7,
+        maxOutputTokens: 256,
+      );
+
+      final body = jsonDecode(bodyJson) as Map<String, dynamic>;
+      expect(body['model'], equals('test-model'));
+      expect(body['temperature'], equals(0.7));
+      expect(body['max_tokens'], equals(256));
+
+      final messages = body['messages'] as List;
+      expect(messages.length, equals(1));
+      expect(messages.first['role'], equals('user'));
+      expect(messages.first['content'], equals('Test prompt without image'));
+    });
+
+    test('buildRequestBody correctly formats image payload messages', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+      );
+
+      final imageBytes = Uint8List.fromList([1, 2, 3, 4]);
+      final base64Image = base64Encode(imageBytes);
+
+      final bodyJson = service.buildRequestBody(
+        prompt: 'Test prompt with image',
+        imageBytes: imageBytes,
+      );
+
+      final body = jsonDecode(bodyJson) as Map<String, dynamic>;
+      expect(body['model'], equals('test-model'));
+      expect(body['temperature'], equals(1.0));
+      expect(body.containsKey('max_tokens'), isFalse);
+
+      final messages = body['messages'] as List;
+      expect(messages.length, equals(1));
+      expect(messages.first['role'], equals('user'));
+      final content = messages.first['content'] as List;
+      expect(content.length, equals(2));
+      expect(
+        content[0],
+        equals({'type': 'text', 'text': 'Test prompt with image'}),
+      );
+      expect(
+        content[1],
+        equals({
+          'type': 'image_url',
+          'image_url': {'url': 'data:image/png;base64,$base64Image'},
+        }),
+      );
+    });
   });
 
   group('Heuristic & Chunk Cleaning Tests', () {
