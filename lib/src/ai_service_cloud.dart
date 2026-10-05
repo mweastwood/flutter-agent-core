@@ -231,11 +231,7 @@ class CloudAiService extends AiService {
       debugPrint(
         'CloudAiService error response: $statusCode - ${lastResponse?.body}',
       );
-      return AiResponse(
-        text: '{"error": "Server returned code $statusCode"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error('Server returned code $statusCode');
     }
 
     try {
