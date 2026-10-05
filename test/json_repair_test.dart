@@ -375,5 +375,15 @@ void main() {
       final rootTrunc = direct.repairJson('tru');
       expect(rootTrunc, equals(''));
     });
+
+    test('handles many rollbacks on large input correctly', () {
+      // Each "bad" literal triggers a rollback of the dangling key.
+      final sb = StringBuffer('{"a": 1');
+      for (var i = 0; i < 20000; i++) {
+        sb.write(', "k$i": bad');
+      }
+      final repaired = direct.repairJson(sb.toString());
+      expect(jsonDecode(repaired), equals({'a': 1}));
+    });
   });
 }

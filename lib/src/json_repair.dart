@@ -66,6 +66,40 @@ bool _isDelimiterOrWhitespace(int codeUnit) {
   }
 }
 
+/// Append-only string builder that supports cheap truncation.
+///
+/// Truncation drops whole trailing chunks and only slices the single chunk
+/// that straddles the target length, so a rollback costs time proportional to
+/// the removed portion rather than the whole output.
+class _ChunkedBuffer {
+  final List<String> _chunks = <String>[];
+  int _length = 0;
+
+  int get length => _length;
+
+  void write(String s) {
+    if (s.isEmpty) return;
+    _chunks.add(s);
+    _length += s.length;
+  }
+
+  void truncateTo(int targetLen) {
+    if (_length <= targetLen) return;
+    while (_chunks.isNotEmpty && _length - _chunks.last.length >= targetLen) {
+      _length -= _chunks.removeLast().length;
+    }
+    if (_length > targetLen) {
+      final last = _chunks.removeLast();
+      final keep = last.length - (_length - targetLen);
+      if (keep > 0) _chunks.add(last.substring(0, keep));
+      _length = targetLen;
+    }
+  }
+
+  @override
+  String toString() => _chunks.join();
+}
+
 /// Repairs truncated or malformed JSON output by balancing braces,
 /// completing unclosed quotes, rolling back dangling keys and colons,
 /// and stripping trailing commas.
@@ -74,15 +108,9 @@ String repairJson(String json) {
   if (json.isEmpty) return '';
 
   final stack = <_StackFrame>[];
-  final output = StringBuffer();
+  final output = _ChunkedBuffer();
 
-  void truncateTo(int targetLen) {
-    if (output.length > targetLen) {
-      final current = output.toString().substring(0, targetLen);
-      output.clear();
-      output.write(current);
-    }
-  }
+  void truncateTo(int targetLen) => output.truncateTo(targetLen);
 
   void onValueCompleted(int endPos) {
     if (stack.isNotEmpty) {
