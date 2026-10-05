@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -184,6 +185,74 @@ void main() {
     test('verifies explicit isError property when set to true', () {
       final response = AiResponse(text: 'error', isError: true);
       expect(response.isError, isTrue);
+    });
+
+    group('AiResponse.error named factory', () {
+      test('encodes plain string message with isError true and valid JSON', () {
+        const message = 'Simple plain error message';
+        final response = AiResponse.error(message);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        expect(response.inputTokens, isNull);
+        expect(response.outputTokens, isNull);
+        expect(response.totalTokens, isNull);
+        expect(response.estimatedCostUsd, isNull);
+
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(message));
+      });
+
+      test('safely encodes embedded double and single quotes', () {
+        const message = 'Error with "double quotes" and \'single quotes\'';
+        final response = AiResponse.error(message);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(message));
+      });
+
+      test('safely encodes backslashes and file paths', () {
+        const message = r'C:\Program Files\App\sub\file.txt and \\server\share';
+        final response = AiResponse.error(message);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(message));
+      });
+
+      test('safely encodes newlines, carriage returns, and tabs', () {
+        const message = "Line 1\nLine 2\r\n\tTabbed line 3\n\t\tDouble indented";
+        final response = AiResponse.error(message);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(message));
+      });
+
+      test('safely encodes control characters', () {
+        const message = "Control chars: \x00 \x01 \x07 \x08 \x0b \x0c \x1b \x1f";
+        final response = AiResponse.error(message);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(message));
+      });
+
+      test('converts non-string Object using toString() and encodes safely', () {
+        final exception =
+            FormatException('Invalid JSON payload: "bad format"\nline 2');
+        final response = AiResponse.error(exception);
+
+        expect(response.isError, isTrue);
+        expect(response.isTruncated, isFalse);
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(decoded['error'], equals(exception.toString()));
+      });
     });
   });
 

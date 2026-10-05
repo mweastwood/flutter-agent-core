@@ -128,11 +128,7 @@ class MethodChannelAiService extends AiService {
       if (result == null) {
         if (lastError != null) {
           debugPrint(lastStackTrace.toString());
-          return AiResponse(
-            text: '{"error": "${lastError.toString().replaceAll('"', '\\"')}"}',
-            isTruncated: false,
-            isError: true,
-          );
+          return AiResponse.error(lastError);
         }
         return null;
       }
@@ -151,11 +147,7 @@ class MethodChannelAiService extends AiService {
     } catch (e, stack) {
       debugPrint('Error generating content via MethodChannel: $e');
       debugPrint(stack.toString());
-      return AiResponse(
-        text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error(e);
     }
   }
 

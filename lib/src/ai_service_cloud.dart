@@ -223,11 +223,7 @@ class CloudAiService extends AiService {
       debugPrint(
         'Error in CloudAiService post request: $lastError\n$lastStackTrace',
       );
-      return AiResponse(
-        text: '{"error": "${lastError.toString().replaceAll('"', '\\"')}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error(lastError);
     }
 
     if (lastResponse == null || lastResponse.statusCode != 200) {
@@ -284,11 +280,7 @@ class CloudAiService extends AiService {
       );
     } catch (e, stack) {
       debugPrint('Error decoding CloudAiService response body: $e\n$stack');
-      return AiResponse(
-        text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error(e);
     }
   }
 
