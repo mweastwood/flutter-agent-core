@@ -41,7 +41,8 @@ class AiResponse {
                 ? inputTokens + outputTokens
                 : null);
 
-  /// Creates an error [AiResponse] with the specified [error] encoded as a JSON object.
+  /// Creates an error [AiResponse] with the specified [error] encoded as a
+  /// JSON object.
   factory AiResponse.error(Object error) => AiResponse(
         text: jsonEncode({'error': error.toString()}),
         isError: true,

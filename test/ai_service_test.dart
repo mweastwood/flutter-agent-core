@@ -224,7 +224,8 @@ void main() {
       });
 
       test('safely encodes newlines, carriage returns, and tabs', () {
-        const message = "Line 1\nLine 2\r\n\tTabbed line 3\n\t\tDouble indented";
+        const message =
+            "Line 1\nLine 2\r\n\tTabbed line 3\n\t\tDouble indented";
         final response = AiResponse.error(message);
 
         expect(response.isError, isTrue);
@@ -234,7 +235,8 @@ void main() {
       });
 
       test('safely encodes control characters', () {
-        const message = "Control chars: \x00 \x01 \x07 \x08 \x0b \x0c \x1b \x1f";
+        const message =
+            "Control chars: \x00 \x01 \x07 \x08 \x0b \x0c \x1b \x1f";
         final response = AiResponse.error(message);
 
         expect(response.isError, isTrue);
@@ -243,7 +245,8 @@ void main() {
         expect(decoded['error'], equals(message));
       });
 
-      test('converts non-string Object using toString() and encodes safely', () {
+      test('converts non-string Object using toString() and encodes safely',
+          () {
         final exception =
             FormatException('Invalid JSON payload: "bad format"\nline 2');
         final response = AiResponse.error(exception);
