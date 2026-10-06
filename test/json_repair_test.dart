@@ -421,6 +421,29 @@ void main() {
       expect(b.toString(), equals(''));
     });
 
+    test('throws RangeError when targetLen is negative', () {
+      final b = build();
+      expect(() => b.truncateTo(-1), throwsA(isA<RangeError>()));
+      final empty = direct.ChunkedBuffer();
+      expect(() => empty.truncateTo(-1), throwsA(isA<RangeError>()));
+    });
+
+    test('reports isEmpty, isNotEmpty, and clear() works correctly', () {
+      final b = direct.ChunkedBuffer();
+      expect(b.isEmpty, isTrue);
+      expect(b.isNotEmpty, isFalse);
+
+      b.write('hello');
+      expect(b.isEmpty, isFalse);
+      expect(b.isNotEmpty, isTrue);
+
+      b.clear();
+      expect(b.length, equals(0));
+      expect(b.isEmpty, isTrue);
+      expect(b.isNotEmpty, isFalse);
+      expect(b.toString(), equals(''));
+    });
+
     test('is a no-op when length is at or below the target', () {
       final b = build();
       b.truncateTo(300);

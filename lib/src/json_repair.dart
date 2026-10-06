@@ -81,6 +81,10 @@ class ChunkedBuffer {
   int _length = 0;
 
   int get length => _length;
+  bool get isEmpty => _length == 0;
+  bool get isNotEmpty => _length > 0;
+
+  void clear() => truncateTo(0);
 
   void write(String s) {
     if (s.isEmpty) return;
@@ -95,7 +99,13 @@ class ChunkedBuffer {
   }
 
   void truncateTo(int targetLen) {
+    RangeError.checkNotNegative(targetLen, 'targetLen');
     if (_length <= targetLen) return;
+    if (targetLen == 0) {
+      _chunks.clear();
+      _length = 0;
+      return;
+    }
     while (_chunks.isNotEmpty && _length - _chunks.last.length >= targetLen) {
       _length -= _chunks.removeLast().length;
     }
