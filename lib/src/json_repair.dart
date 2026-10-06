@@ -66,6 +66,61 @@ bool _isDelimiterOrWhitespace(int codeUnit) {
   }
 }
 
+/// Append-only string builder that supports cheap truncation.
+///
+/// Truncation drops whole trailing chunks and only slices the single chunk
+/// that straddles the target length, so a rollback costs time proportional to
+/// the removed portion rather than the whole output.
+@visibleForTesting
+class ChunkedBuffer {
+  /// Writes shorter than this are merged into a short trailing chunk to avoid
+  /// one list entry per tiny write (e.g. ',' and ':').
+  static const int _coalesceLimit = 64;
+
+  final List<String> _chunks = <String>[];
+  int _length = 0;
+
+  int get length => _length;
+  bool get isEmpty => _length == 0;
+  bool get isNotEmpty => _length > 0;
+
+  void clear() => truncateTo(0);
+
+  void write(String s) {
+    if (s.isEmpty) return;
+    if (_chunks.isNotEmpty &&
+        s.length < _coalesceLimit &&
+        _chunks.last.length < _coalesceLimit) {
+      _chunks[_chunks.length - 1] = _chunks.last + s;
+    } else {
+      _chunks.add(s);
+    }
+    _length += s.length;
+  }
+
+  void truncateTo(int targetLen) {
+    RangeError.checkNotNegative(targetLen, 'targetLen');
+    if (_length <= targetLen) return;
+    if (targetLen == 0) {
+      _chunks.clear();
+      _length = 0;
+      return;
+    }
+    while (_chunks.isNotEmpty && _length - _chunks.last.length >= targetLen) {
+      _length -= _chunks.removeLast().length;
+    }
+    if (_length > targetLen) {
+      final last = _chunks.removeLast();
+      final keep = last.length - (_length - targetLen);
+      if (keep > 0) _chunks.add(last.substring(0, keep));
+      _length = targetLen;
+    }
+  }
+
+  @override
+  String toString() => _chunks.join();
+}
+
 /// Repairs truncated or malformed JSON output by balancing braces,
 /// completing unclosed quotes, rolling back dangling keys and colons,
 /// and stripping trailing commas.
@@ -74,15 +129,7 @@ String repairJson(String json) {
   if (json.isEmpty) return '';
 
   final stack = <_StackFrame>[];
-  final output = StringBuffer();
-
-  void truncateTo(int targetLen) {
-    if (output.length > targetLen) {
-      final current = output.toString().substring(0, targetLen);
-      output.clear();
-      output.write(current);
-    }
-  }
+  final output = ChunkedBuffer();
 
   void onValueCompleted(int endPos) {
     if (stack.isNotEmpty) {
@@ -200,7 +247,7 @@ String repairJson(String json) {
       while (stack.isNotEmpty && stack.last.type != _ContainerType.object) {
         final frame = stack.removeLast();
         if (frame.arrayState == _ArrayState.expectingValue) {
-          truncateTo(frame.lastCompleteEntryEndPos);
+          output.truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write(']');
         if (stack.isNotEmpty) {
@@ -211,7 +258,7 @@ String repairJson(String json) {
       if (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
         final frame = stack.removeLast();
         if (frame.objectState != _ObjectState.expectingCommaOrClose) {
-          truncateTo(frame.lastCompleteEntryEndPos);
+          output.truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write('}');
         i++;
@@ -227,7 +274,7 @@ String repairJson(String json) {
       while (stack.isNotEmpty && stack.last.type == _ContainerType.object) {
         final frame = stack.removeLast();
         if (frame.objectState != _ObjectState.expectingCommaOrClose) {
-          truncateTo(frame.lastCompleteEntryEndPos);
+          output.truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write('}');
         if (stack.isNotEmpty) {
@@ -238,7 +285,7 @@ String repairJson(String json) {
       if (stack.isNotEmpty && stack.last.type == _ContainerType.array) {
         final frame = stack.removeLast();
         if (frame.arrayState == _ArrayState.expectingValue) {
-          truncateTo(frame.lastCompleteEntryEndPos);
+          output.truncateTo(frame.lastCompleteEntryEndPos);
         }
         output.write(']');
         i++;
@@ -261,9 +308,9 @@ String repairJson(String json) {
       onValueCompleted(output.length);
     } else {
       if (stack.isNotEmpty) {
-        truncateTo(stack.last.lastCompleteEntryEndPos);
+        output.truncateTo(stack.last.lastCompleteEntryEndPos);
       } else {
-        truncateTo(0);
+        output.truncateTo(0);
       }
     }
   }
@@ -272,7 +319,7 @@ String repairJson(String json) {
     final frame = stack.removeLast();
     if (frame.type == _ContainerType.object) {
       if (frame.objectState != _ObjectState.expectingCommaOrClose) {
-        truncateTo(frame.lastCompleteEntryEndPos);
+        output.truncateTo(frame.lastCompleteEntryEndPos);
       }
       output.write('}');
       if (stack.isNotEmpty) {
@@ -280,7 +327,7 @@ String repairJson(String json) {
       }
     } else {
       if (frame.arrayState == _ArrayState.expectingValue) {
-        truncateTo(frame.lastCompleteEntryEndPos);
+        output.truncateTo(frame.lastCompleteEntryEndPos);
       }
       output.write(']');
       if (stack.isNotEmpty) {
