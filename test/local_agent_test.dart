@@ -2875,8 +2875,7 @@ void main() {
       expect(response.totalTokens, equals(25 + response.outputTokens!));
     });
 
-    test(
-        'parseResponse marks isTruncated true when finish_reason is length',
+    test('parseResponse marks isTruncated true when finish_reason is length',
         () async {
       final service = CloudAiService(
         baseUrl: 'https://api.example.com',
