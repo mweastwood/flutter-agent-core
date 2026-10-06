@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:fake_async/fake_async.dart';
@@ -226,7 +227,12 @@ void main() {
         expect(response.isTruncated, isFalse);
         expect(
           response.text,
-          equals('{"error": "Exception: Prompt failed: \\"rate-limited\\""}'),
+          equals('{"error":"Exception: Prompt failed: \\"rate-limited\\""}'),
+        );
+        final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+        expect(
+          decoded['error'],
+          equals('Exception: Prompt failed: "rate-limited"'),
         );
       });
     });

@@ -83,11 +83,7 @@ class WebAiService extends AiService {
       );
     } catch (e) {
       debugPrint('Error generating content from Web AI: $e');
-      return AiResponse(
-        text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error(e);
     }
   }
 
