@@ -15,7 +15,7 @@ final _trailingSlashesRegex = RegExp(r'/+$');
 
 class CloudAiService extends AiService {
   @visibleForTesting
-  static const retryableStatusCodes = {429, 500, 502, 503, 504};
+  static const Set<int> retryableStatusCodes = {429, 500, 502, 503, 504};
 
   final String baseUrl;
   final String apiKey;
@@ -159,8 +159,11 @@ class CloudAiService extends AiService {
     });
   }
 
+  @visibleForTesting
+  Future<http.Response> postWithRetry(String body) => _postWithRetry(body);
+
   Future<http.Response> _postWithRetry(String body) async {
-    dynamic lastError;
+    Object? lastError;
     StackTrace? lastStackTrace;
     http.Response? lastResponse;
 
@@ -213,11 +216,28 @@ class CloudAiService extends AiService {
       debugPrint(
         'Error in CloudAiService post request: $lastError\n$lastStackTrace',
       );
-      throw lastError;
+      Error.throwWithStackTrace(
+        lastError,
+        lastStackTrace ?? StackTrace.current,
+      );
     }
 
     return lastResponse!;
   }
+
+  @visibleForTesting
+  Future<AiResponse?> parseResponse({
+    required http.Response response,
+    required String prompt,
+    Uint8List? imageBytes,
+    int? estimatedPromptTokens,
+  }) =>
+      _parseResponse(
+        response: response,
+        prompt: prompt,
+        imageBytes: imageBytes,
+        estimatedPromptTokens: estimatedPromptTokens,
+      );
 
   Future<AiResponse?> _parseResponse({
     required http.Response response,

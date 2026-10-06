@@ -2711,6 +2711,227 @@ void main() {
         }),
       );
     });
+
+    test(
+        'buildRequestBody correctly falls back to text-only message when imageBytes is empty',
+        () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+      );
+
+      final bodyJson = service.buildRequestBody(
+        prompt: 'Test prompt with empty imageBytes',
+        imageBytes: Uint8List(0),
+      );
+
+      final body = jsonDecode(bodyJson) as Map<String, dynamic>;
+      final messages = body['messages'] as List;
+      expect(messages.length, equals(1));
+      expect(messages.first['role'], equals('user'));
+      expect(
+        messages.first['content'],
+        equals('Test prompt with empty imageBytes'),
+      );
+    });
+
+    test('postWithRetry retries on HTTP 503 Service Unavailable until success',
+        () async {
+      int attempts = 0;
+      final mockClient = MockHttpClient((request) async {
+        attempts++;
+        if (attempts < 3) {
+          return http.Response('Service Unavailable', 503);
+        }
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'role': 'assistant', 'content': 'ok after 503'},
+                'finish_reason': 'stop',
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetries: 3,
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
+
+      final response = await service.postWithRetry('{"test": true}');
+      expect(attempts, equals(3));
+      expect(response.statusCode, equals(200));
+      expect(response.body, contains('ok after 503'));
+    });
+
+    test(
+        'postWithRetry preserves stack trace on error rethrow after retries exhausted',
+        () async {
+      final mockClient = MockHttpClient((request) async {
+        throw http.ClientException('Connection failed');
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetries: 1,
+        initialRetryDelay: Duration.zero,
+        httpClient: mockClient,
+      );
+
+      try {
+        await service.postWithRetry('{"test": true}');
+        fail('Should have thrown ClientException');
+      } catch (e, stack) {
+        expect(e, isA<http.ClientException>());
+        expect(stack.toString(), isNotEmpty);
+      }
+    });
+
+    test(
+        'parseResponse handles valid response, token counts, and cost calculation',
+        () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'gemini-3.6-flash',
+      );
+
+      final httpResponse = http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'role': 'assistant',
+                'content': 'Parsed response text',
+              },
+              'finish_reason': 'stop',
+            },
+          ],
+          'usage': {
+            'prompt_tokens': 100,
+            'completion_tokens': 50,
+            'total_tokens': 150,
+          },
+        }),
+        200,
+      );
+
+      final response = await service.parseResponse(
+        response: httpResponse,
+        prompt: 'test prompt',
+      );
+
+      expect(response, isNotNull);
+      expect(response!.text, equals('Parsed response text'));
+      expect(response.isTruncated, isFalse);
+      expect(response.isError, isFalse);
+      expect(response.inputTokens, equals(100));
+      expect(response.outputTokens, equals(50));
+      expect(response.totalTokens, equals(150));
+      // gemini-3.6-flash: 100/1M * 1.50 + 50/1M * 7.50 = 0.00015 + 0.000375 = 0.000525
+      expect(response.estimatedCostUsd, closeTo(0.000525, 0.0000001));
+    });
+
+    test('parseResponse handles token fallback counting when usage is missing',
+        () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+      );
+
+      final httpResponse = http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'role': 'assistant', 'content': 'Sample output'},
+              'finish_reason': 'stop',
+            },
+          ],
+        }),
+        200,
+      );
+
+      final response = await service.parseResponse(
+        response: httpResponse,
+        prompt: 'Short prompt',
+        estimatedPromptTokens: 25,
+      );
+
+      expect(response, isNotNull);
+      expect(response!.text, equals('Sample output'));
+      expect(response.inputTokens, equals(25));
+      expect(response.outputTokens, isNotNull);
+      expect(response.totalTokens, equals(25 + response.outputTokens!));
+    });
+
+    test(
+        'parseResponse marks isTruncated true when finish_reason is length',
+        () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+      );
+
+      final httpResponse = http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'role': 'assistant',
+                'content': 'Truncated content...',
+              },
+              'finish_reason': 'length',
+            },
+          ],
+        }),
+        200,
+      );
+
+      final response = await service.parseResponse(
+        response: httpResponse,
+        prompt: 'long prompt',
+      );
+
+      expect(response, isNotNull);
+      expect(response!.text, equals('Truncated content...'));
+      expect(response.isTruncated, isTrue);
+      expect(response.isError, isFalse);
+    });
+
+    test('parseResponse handles malformed JSON errors gracefully', () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+      );
+
+      final httpResponse = http.Response(
+        'not valid json at all {{{',
+        200,
+      );
+
+      final response = await service.parseResponse(
+        response: httpResponse,
+        prompt: 'test prompt',
+      );
+
+      expect(response, isNotNull);
+      expect(response!.isError, isTrue);
+      expect(response.isTruncated, isFalse);
+      expect(response.text, contains('error'));
+    });
   });
 
   group('Heuristic & Chunk Cleaning Tests', () {
