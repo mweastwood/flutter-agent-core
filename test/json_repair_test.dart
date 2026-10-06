@@ -376,14 +376,71 @@ void main() {
       expect(rootTrunc, equals(''));
     });
 
-    test('handles many rollbacks on large input correctly', () {
-      // Each "bad" literal triggers a rollback of the dangling key.
-      final sb = StringBuffer('{"a": 1');
+    test('handles many rollbacks after a large valid prefix', () {
+      // A large valid prefix is built first so each rollback has to discard
+      // output while a large amount of valid output remains in the buffer.
+      final big = 'x' * 100000;
+      final sb = StringBuffer('{"big": "$big"');
+      for (var i = 0; i < 1000; i++) {
+        sb.write(', "e$i": $i');
+      }
+      final prefix = sb.toString();
       for (var i = 0; i < 20000; i++) {
         sb.write(', "k$i": bad');
       }
       final repaired = direct.repairJson(sb.toString());
-      expect(jsonDecode(repaired), equals({'a': 1}));
+      expect(jsonDecode(repaired), isA<Map<String, dynamic>>());
+      final decoded = jsonDecode(repaired) as Map<String, dynamic>;
+      expect(decoded['big'], equals(big));
+      expect(decoded.length, equals(1001));
+      expect(repaired.length, lessThanOrEqualTo(prefix.length + 1));
+    });
+  });
+
+  group('ChunkedBuffer', () {
+    direct.ChunkedBuffer build() => direct.ChunkedBuffer()
+      ..write('a' * 100)
+      ..write('b' * 100)
+      ..write('c' * 100);
+
+    test('truncates at an exact chunk boundary', () {
+      final b = build()..truncateTo(200);
+      expect(b.length, equals(200));
+      expect(b.toString(), equals('${'a' * 100}${'b' * 100}'));
+    });
+
+    test('truncates mid-chunk', () {
+      final b = build()..truncateTo(150);
+      expect(b.length, equals(150));
+      expect(b.toString(), equals('${'a' * 100}${'b' * 50}'));
+    });
+
+    test('truncates to zero', () {
+      final b = build()..truncateTo(0);
+      expect(b.length, equals(0));
+      expect(b.toString(), equals(''));
+    });
+
+    test('is a no-op when length is at or below the target', () {
+      final b = build();
+      b.truncateTo(300);
+      expect(b.length, equals(300));
+      b.truncateTo(1000);
+      expect(b.length, equals(300));
+      expect(b.toString(), equals('${'a' * 100}${'b' * 100}${'c' * 100}'));
+    });
+
+    test('supports writes after truncation and coalesces small writes', () {
+      final b = direct.ChunkedBuffer()
+        ..write('{')
+        ..write('"k"')
+        ..write(':')
+        ..write('1');
+      expect(b.toString(), equals('{"k":1'));
+      b.truncateTo(4);
+      b.write('2');
+      expect(b.length, equals(5));
+      expect(b.toString(), equals('{"k"2'));
     });
   });
 }
