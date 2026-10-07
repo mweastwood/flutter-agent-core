@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io' show HttpDate;
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -28,6 +29,7 @@ class CloudAiService extends AiService {
   final Map<String, String> _headers;
   final RateLimiter? _rateLimiter;
   final Random? _random;
+  final DateTime Function() _clock;
 
   CloudAiService({
     required this.baseUrl,
@@ -40,9 +42,11 @@ class CloudAiService extends AiService {
     this.enableJitter = true,
     http.Client? httpClient,
     Random? random,
+    DateTime Function()? clock,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _random = random,
+        _clock = clock ?? DateTime.now,
         _endpointUri = Uri.parse(
           '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
         ),
@@ -95,10 +99,18 @@ class CloudAiService extends AiService {
       AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 
   @visibleForTesting
-  Duration calculateBackoff(int attempt, http.Response? response) =>
-      _calculateBackoff(attempt, response);
+  Duration calculateBackoff(
+    int attempt,
+    http.Response? response, {
+    DateTime? now,
+  }) =>
+      _calculateBackoff(attempt, response, now: now);
 
-  Duration _calculateBackoff(int attempt, http.Response? response) {
+  Duration _calculateBackoff(
+    int attempt,
+    http.Response? response, {
+    DateTime? now,
+  }) {
     if (response != null) {
       String? retryAfterStr;
       for (final entry in response.headers.entries) {
@@ -108,9 +120,32 @@ class CloudAiService extends AiService {
         }
       }
       if (retryAfterStr != null) {
-        final seconds = int.tryParse(retryAfterStr.trim());
-        if (seconds != null && seconds > 0) {
-          return Duration(seconds: seconds);
+        final trimmed = retryAfterStr.trim();
+        final seconds = int.tryParse(trimmed);
+        Duration? delay;
+        if (seconds != null) {
+          if (seconds >= 0) {
+            delay = Duration(seconds: seconds);
+          }
+        } else {
+          try {
+            final targetDate = HttpDate.parse(trimmed);
+            final currentTime = now ?? _clock();
+            final diff = targetDate.difference(currentTime);
+            delay = diff.isNegative ? Duration.zero : diff;
+          } catch (_) {
+            // Malformed or unrecognized Retry-After header.
+          }
+        }
+
+        if (delay != null) {
+          if (delay > maxRetryDelay) {
+            return maxRetryDelay;
+          }
+          if (delay < Duration.zero) {
+            return Duration.zero;
+          }
+          return delay;
         }
       }
     }

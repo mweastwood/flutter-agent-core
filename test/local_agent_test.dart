@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show HttpDate;
 import 'dart:math';
 
 import 'package:fake_async/fake_async.dart';
@@ -2092,6 +2093,183 @@ void main() {
     });
 
     test(
+        'generateContentRaw clamps excessive Retry-After to maxRetryDelay',
+        () {
+      fakeAsync((async) {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
+          if (attempts == 1) {
+            return http.Response(
+              'Too Many Requests',
+              429,
+              headers: {'retry-after': '3600'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'recovered after clamped backoff',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          maxRetryDelay: const Duration(seconds: 3),
+          httpClient: mockClient,
+        );
+
+        AiResponse? response;
+        service.generateContentRaw(prompt: 'hello').then((res) {
+          response = res;
+        });
+
+        async.flushMicrotasks();
+        expect(attempts, equals(1));
+        expect(response, isNull);
+
+        // Advance 2 seconds - should not yet retry
+        async.elapse(const Duration(seconds: 2));
+        async.flushMicrotasks();
+        expect(attempts, equals(1));
+
+        // Advance 1 more second to reach maxRetryDelay (3 seconds total)
+        async.elapse(const Duration(seconds: 1));
+        async.flushMicrotasks();
+
+        expect(attempts, equals(2));
+        expect(response?.text, equals('recovered after clamped backoff'));
+        expect(response?.isError, isFalse);
+      });
+    });
+
+    test('generateContentRaw retries immediately when Retry-After is 0', () {
+      fakeAsync((async) {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
+          if (attempts == 1) {
+            return http.Response(
+              'Too Many Requests',
+              429,
+              headers: {'Retry-After': '0'},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'immediate retry success',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          initialRetryDelay: const Duration(seconds: 5),
+          httpClient: mockClient,
+        );
+
+        AiResponse? response;
+        service.generateContentRaw(prompt: 'hello').then((res) {
+          response = res;
+        });
+
+        // Retry-After: 0 should not wait initialRetryDelay (5s); it
+        // schedules Future.delayed(Duration.zero) which completes on next turn.
+        async.flushMicrotasks();
+        async.elapse(Duration.zero);
+        async.flushMicrotasks();
+
+        expect(attempts, equals(2));
+        expect(response?.text, equals('immediate retry success'));
+        expect(response?.isError, isFalse);
+      });
+    });
+
+    test('generateContentRaw honors HTTP-date Retry-After header', () {
+      final startTime = DateTime.utc(2026, 10, 7, 12, 0, 0);
+      fakeAsync((async) {
+        int attempts = 0;
+        final mockClient = MockHttpClient((request) async {
+          attempts++;
+          if (attempts == 1) {
+            final retryDate = startTime.add(const Duration(seconds: 4));
+            return http.Response(
+              'Too Many Requests',
+              429,
+              headers: {'Retry-After': HttpDate.format(retryDate)},
+            );
+          }
+          return http.Response(
+            jsonEncode({
+              'choices': [
+                {
+                  'message': {
+                    'role': 'assistant',
+                    'content': 'http-date retry success',
+                  },
+                  'finish_reason': 'stop',
+                },
+              ],
+            }),
+            200,
+          );
+        });
+
+        final service = CloudAiService(
+          baseUrl: 'https://api.gemini.com/v1',
+          apiKey: 'test-key',
+          modelName: 'gemini-1.5-flash',
+          clock: () => startTime,
+          httpClient: mockClient,
+        );
+
+        AiResponse? response;
+        service.generateContentRaw(prompt: 'hello').then((res) {
+          response = res;
+        });
+
+        async.flushMicrotasks();
+        expect(attempts, equals(1));
+        expect(response, isNull);
+
+        // Advance 3 seconds - should not yet retry
+        async.elapse(const Duration(seconds: 3));
+        async.flushMicrotasks();
+        expect(attempts, equals(1));
+
+        // Advance 1 more second to reach 4 seconds
+        async.elapse(const Duration(seconds: 1));
+        async.flushMicrotasks();
+
+        expect(attempts, equals(2));
+        expect(response?.text, equals('http-date retry success'));
+        expect(response?.isError, isFalse);
+      });
+    });
+
+    test(
         'handles case-insensitive Retry-After header variations in calculateBackoff',
         () {
       final service = CloudAiService(
@@ -2128,6 +2306,158 @@ void main() {
       expect(
         service.calculateBackoff(1, lowerResponse),
         equals(const Duration(seconds: 3)),
+      );
+    });
+
+    test('clamps Retry-After header delay to maxRetryDelay in calculateBackoff',
+        () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetryDelay: const Duration(seconds: 15),
+      );
+
+      final responseExceedingDefault = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': '100000'},
+      );
+      expect(
+        service.calculateBackoff(1, responseExceedingDefault),
+        equals(const Duration(seconds: 15)),
+      );
+
+      final serviceCustomMax = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetryDelay: const Duration(seconds: 25),
+      );
+
+      final response3600 = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'retry-after': '3600'},
+      );
+      expect(
+        serviceCustomMax.calculateBackoff(1, response3600),
+        equals(const Duration(seconds: 25)),
+      );
+
+      final responseUnderLimit = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': '10'},
+      );
+      expect(
+        serviceCustomMax.calculateBackoff(1, responseUnderLimit),
+        equals(const Duration(seconds: 10)),
+      );
+    });
+
+    test('treats Retry-After: 0 as valid zero-duration delay', () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+      );
+
+      final zeroResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': '0'},
+      );
+      expect(
+        service.calculateBackoff(1, zeroResponse),
+        equals(Duration.zero),
+      );
+    });
+
+    test('parses and clamps HTTP-date values in Retry-After header', () {
+      final fixedNow = DateTime.utc(2026, 10, 7, 12, 0, 0);
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        maxRetryDelay: const Duration(seconds: 15),
+        clock: () => fixedNow,
+      );
+
+      // 8 seconds in the future
+      final futureDate = fixedNow.add(const Duration(seconds: 8));
+      final dateResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': HttpDate.format(futureDate)},
+      );
+      expect(
+        service.calculateBackoff(1, dateResponse),
+        equals(const Duration(seconds: 8)),
+      );
+
+      // Also verify passing now directly to calculateBackoff
+      expect(
+        service.calculateBackoff(1, dateResponse, now: fixedNow),
+        equals(const Duration(seconds: 8)),
+      );
+
+      // 2 hours in the future (clamped to maxRetryDelay)
+      final farFutureDate = fixedNow.add(const Duration(hours: 2));
+      final farDateResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': HttpDate.format(farFutureDate)},
+      );
+      expect(
+        service.calculateBackoff(1, farDateResponse),
+        equals(const Duration(seconds: 15)),
+      );
+
+      // In the past (clamped to Duration.zero)
+      final pastDate = fixedNow.subtract(const Duration(seconds: 30));
+      final pastDateResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': HttpDate.format(pastDate)},
+      );
+      expect(
+        service.calculateBackoff(1, pastDateResponse),
+        equals(Duration.zero),
+      );
+    });
+
+    test(
+        'falls back to exponential backoff when Retry-After is malformed '
+        'or negative',
+        () {
+      final service = CloudAiService(
+        baseUrl: 'https://api.gemini.com/v1',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+        initialRetryDelay: const Duration(milliseconds: 1000),
+        maxRetryDelay: const Duration(seconds: 15),
+        enableJitter: false,
+      );
+
+      final negativeResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': '-5'},
+      );
+      expect(
+        service.calculateBackoff(1, negativeResponse),
+        equals(const Duration(milliseconds: 1000)),
+      );
+
+      final invalidResponse = http.Response(
+        'Too Many Requests',
+        429,
+        headers: {'Retry-After': 'invalid-not-a-date-or-number'},
+      );
+      expect(
+        service.calculateBackoff(1, invalidResponse),
+        equals(const Duration(milliseconds: 1000)),
       );
     });
 
