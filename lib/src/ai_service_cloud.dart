@@ -21,6 +21,10 @@ class CloudAiService extends AiService {
   final int maxRetries;
   final Duration initialRetryDelay;
   final Duration maxRetryDelay;
+
+  /// Maximum time to wait for a single HTTP POST before it is aborted with a
+  /// [TimeoutException] and handled by the retry loop.
+  final Duration requestTimeout;
   final bool enableJitter;
   final http.Client _httpClient;
   final bool _ownsHttpClient;
@@ -37,6 +41,7 @@ class CloudAiService extends AiService {
     this.maxRetries = 4,
     this.initialRetryDelay = const Duration(milliseconds: 1500),
     this.maxRetryDelay = const Duration(seconds: 15),
+    this.requestTimeout = const Duration(seconds: 60),
     this.enableJitter = true,
     http.Client? httpClient,
     Random? random,
@@ -172,11 +177,13 @@ class CloudAiService extends AiService {
 
     for (int attempt = 1; attempt <= totalAttempts; attempt++) {
       try {
-        final response = await _httpClient.post(
-          _endpointUri,
-          headers: _headers,
-          body: body,
-        );
+        final response = await _httpClient
+            .post(
+              _endpointUri,
+              headers: _headers,
+              body: body,
+            )
+            .timeout(requestTimeout);
 
         lastResponse = response;
         lastError = null;
