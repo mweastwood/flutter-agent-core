@@ -13,6 +13,153 @@ import 'rate_limiter.dart';
 final _reNonAscii = RegExp(r'[^\x00-\x7F]');
 final _trailingSlashesRegex = RegExp(r'/+$');
 
+const Map<String, int> _monthMap = {
+  'jan': 1,
+  'feb': 2,
+  'mar': 3,
+  'apr': 4,
+  'may': 5,
+  'jun': 6,
+  'jul': 7,
+  'aug': 8,
+  'sep': 9,
+  'oct': 10,
+  'nov': 11,
+  'dec': 12,
+};
+
+/// Regular expressions for RFC 9110 / RFC 7231 / RFC 2616 HTTP-date formats:
+/// 1. IMF-fixdate (preferred): "Sun, 06 Nov 1994 08:49:37 GMT"
+final RegExp _imfFixdateRegex = RegExp(
+  r'^(?:[A-Za-z]{3},\s+)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})\s+GMT$',
+  caseSensitive: false,
+);
+
+/// 2. RFC 850 format: "Sunday, 06-Nov-94 08:49:37 GMT"
+final RegExp _rfc850Regex = RegExp(
+  r'^(?:[A-Za-z]+,\s+)?(\d{1,2})-([A-Za-z]{3})-(\d{2})\s+(\d{2}):(\d{2}):(\d{2})\s+GMT$',
+  caseSensitive: false,
+);
+
+/// 3. ANSI C asctime() format: "Sun Nov  6 08:49:37 1994"
+final RegExp _asctimeRegex = RegExp(
+  r'^[A-Za-z]{3}\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})$',
+  caseSensitive: false,
+);
+
+/// Parses an RFC 9110 / RFC 7231 HTTP-date string into a UTC [DateTime].
+///
+/// Supports IMF-fixdate (e.g. `Sun, 06 Nov 1994 08:49:37 GMT`),
+/// RFC 850 format (e.g. `Sunday, 06-Nov-94 08:49:37 GMT`), and
+/// ANSI C asctime() format (e.g. `Sun Nov  6 08:49:37 1994`).
+/// Returns `null` if the date string is malformed or invalid.
+DateTime? tryParseHttpDate(String dateString) {
+  final trimmed = dateString.trim();
+  if (trimmed.isEmpty) return null;
+
+  var match = _imfFixdateRegex.firstMatch(trimmed);
+  if (match != null) {
+    final day = int.tryParse(match.group(1)!);
+    final monthStr = match.group(2)!.toLowerCase();
+    final year = int.tryParse(match.group(3)!);
+    final hour = int.tryParse(match.group(4)!);
+    final minute = int.tryParse(match.group(5)!);
+    final second = int.tryParse(match.group(6)!);
+    final month = _monthMap[monthStr];
+
+    if (day == null ||
+        month == null ||
+        year == null ||
+        hour == null ||
+        minute == null ||
+        second == null) {
+      return null;
+    }
+    return _buildValidUtcDateTime(year, month, day, hour, minute, second);
+  }
+
+  match = _rfc850Regex.firstMatch(trimmed);
+  if (match != null) {
+    final day = int.tryParse(match.group(1)!);
+    final monthStr = match.group(2)!.toLowerCase();
+    final year2 = int.tryParse(match.group(3)!);
+    final hour = int.tryParse(match.group(4)!);
+    final minute = int.tryParse(match.group(5)!);
+    final second = int.tryParse(match.group(6)!);
+    final month = _monthMap[monthStr];
+
+    if (day == null ||
+        month == null ||
+        year2 == null ||
+        hour == null ||
+        minute == null ||
+        second == null) {
+      return null;
+    }
+    final year = year2 >= 70 ? 1900 + year2 : 2000 + year2;
+    return _buildValidUtcDateTime(year, month, day, hour, minute, second);
+  }
+
+  match = _asctimeRegex.firstMatch(trimmed);
+  if (match != null) {
+    final monthStr = match.group(1)!.toLowerCase();
+    final day = int.tryParse(match.group(2)!);
+    final hour = int.tryParse(match.group(3)!);
+    final minute = int.tryParse(match.group(4)!);
+    final second = int.tryParse(match.group(5)!);
+    final year = int.tryParse(match.group(6)!);
+    final month = _monthMap[monthStr];
+
+    if (day == null ||
+        month == null ||
+        year == null ||
+        hour == null ||
+        minute == null ||
+        second == null) {
+      return null;
+    }
+    return _buildValidUtcDateTime(year, month, day, hour, minute, second);
+  }
+
+  return null;
+}
+
+DateTime? _buildValidUtcDateTime(
+  int year,
+  int month,
+  int day,
+  int hour,
+  int minute,
+  int second,
+) {
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > 31) return null;
+  if (hour < 0 || hour > 23) return null;
+  if (minute < 0 || minute > 59) return null;
+  if (second < 0 || second > 60) return null;
+
+  try {
+    final dt = DateTime.utc(
+      year,
+      month,
+      day,
+      hour,
+      minute,
+      second == 60 ? 59 : second,
+    );
+    if (dt.year != year ||
+        dt.month != month ||
+        dt.day != day ||
+        dt.hour != hour ||
+        dt.minute != minute) {
+      return null;
+    }
+    return dt;
+  } catch (_) {
+    return null;
+  }
+}
+
 class CloudAiService extends AiService {
   final String baseUrl;
   final String apiKey;
@@ -28,6 +175,7 @@ class CloudAiService extends AiService {
   final Map<String, String> _headers;
   final RateLimiter? _rateLimiter;
   final Random? _random;
+  final DateTime Function() _nowProvider;
 
   CloudAiService({
     required this.baseUrl,
@@ -45,6 +193,7 @@ class CloudAiService extends AiService {
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _random = random,
+        _nowProvider = nowProvider ?? DateTime.now,
         _endpointUri = Uri.parse(
           '${baseUrl.trim().replaceAll(_trailingSlashesRegex, '')}/chat/completions',
         ),
@@ -102,10 +251,22 @@ class CloudAiService extends AiService {
       AiService.estimateTokenCount(prompt, imageBytes: imageBytes);
 
   @visibleForTesting
-  Duration calculateBackoff(int attempt, http.Response? response) =>
-      _calculateBackoff(attempt, response);
+  static DateTime? parseHttpDate(String dateString) =>
+      tryParseHttpDate(dateString);
 
-  Duration _calculateBackoff(int attempt, http.Response? response) {
+  @visibleForTesting
+  Duration calculateBackoff(
+    int attempt,
+    http.Response? response, {
+    DateTime? now,
+  }) =>
+      _calculateBackoff(attempt, response, now: now);
+
+  Duration _calculateBackoff(
+    int attempt,
+    http.Response? response, {
+    DateTime? now,
+  }) {
     if (response != null) {
       String? retryAfterStr;
       for (final entry in response.headers.entries) {
@@ -115,9 +276,35 @@ class CloudAiService extends AiService {
         }
       }
       if (retryAfterStr != null) {
-        final seconds = int.tryParse(retryAfterStr.trim());
-        if (seconds != null && seconds > 0) {
-          return Duration(seconds: seconds);
+        final trimmed = retryAfterStr.trim();
+        final seconds = int.tryParse(trimmed);
+        Duration? delay;
+        if (seconds != null) {
+          if (seconds >= 0) {
+            if (seconds > maxRetryDelay.inSeconds) {
+              delay = maxRetryDelay;
+            } else {
+              final candidate = Duration(seconds: seconds);
+              delay = candidate > maxRetryDelay ? maxRetryDelay : candidate;
+            }
+          }
+        } else {
+          final targetDate = tryParseHttpDate(trimmed);
+          if (targetDate != null) {
+            final currentTime = now ?? _nowProvider();
+            final diff = targetDate.difference(currentTime);
+            delay = diff.isNegative ? Duration.zero : diff;
+          }
+        }
+
+        if (delay != null) {
+          if (delay > maxRetryDelay) {
+            return maxRetryDelay;
+          }
+          if (delay < Duration.zero) {
+            return Duration.zero;
+          }
+          return delay;
         }
       }
     }
