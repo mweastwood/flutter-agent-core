@@ -32,6 +32,9 @@ class _StackFrame {
 }
 
 final _reJsonNumber = RegExp(r'^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$');
+final _incompleteUnicodeEscape =
+    RegExp(r'(?:^|[^\\])(?:\\\\)*(\\u[0-9a-fA-F]{0,3})$');
+
 
 bool _isValidJsonLiteral(String token) {
   if (token == 'true' || token == 'false' || token == 'null') {
@@ -176,12 +179,23 @@ String repairJson(String json) {
         }
       }
 
-      output.write(json.substring(stringStart, i));
       if (!stringClosed) {
-        if (escape) {
-          output.write(r'\');
+        final match = _incompleteUnicodeEscape.firstMatch(
+          json.substring(stringStart, i),
+        );
+        if (match != null) {
+          final strippedLength = match.group(1)!.length;
+          output.write(json.substring(stringStart, i - strippedLength));
+          output.write('"');
+        } else {
+          output.write(json.substring(stringStart, i));
+          if (escape) {
+            output.write(r'\');
+          }
+          output.write('"');
         }
-        output.write('"');
+      } else {
+        output.write(json.substring(stringStart, i));
       }
 
       if (stack.isNotEmpty) {
