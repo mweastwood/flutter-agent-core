@@ -290,6 +290,70 @@ void main() {
       expect(jsonDecode(escapedQuote), equals({'message': 'He said "hello'}));
     });
 
+    test(
+        'repairs unclosed strings with truncated unicode escape sequences',
+        () {
+      // Truncation with \u (0 hex digits)
+      final u0 = direct.repairJson(r'{"a": "caf\u');
+      expect(u0, equals(r'{"a": "caf"}'));
+      expect(jsonDecode(u0), equals({'a': 'caf'}));
+
+      // Truncation with \u0 (1 hex digit)
+      final u1 = direct.repairJson(r'{"a": "caf\u0');
+      expect(u1, equals(r'{"a": "caf"}'));
+      expect(jsonDecode(u1), equals({'a': 'caf'}));
+
+      // Truncation with \u00 (2 hex digits)
+      final u2 = direct.repairJson(r'{"a": "caf\u00');
+      expect(u2, equals(r'{"a": "caf"}'));
+      expect(jsonDecode(u2), equals({'a': 'caf'}));
+
+      // Truncation with \u00a (3 hex digits)
+      final u3 = direct.repairJson(r'{"a": "caf\u00a');
+      expect(u3, equals(r'{"a": "caf"}'));
+      expect(jsonDecode(u3), equals({'a': 'caf'}));
+
+      // Truncation with uppercase hex digits
+      final uUpper = direct.repairJson(r'{"a": "caf\u00A');
+      expect(uUpper, equals(r'{"a": "caf"}'));
+      expect(jsonDecode(uUpper), equals({'a': 'caf'}));
+
+      // Complete 4-hex escape preserved
+      final completeEscape = direct.repairJson(r'{"a": "caf\u0061');
+      expect(completeEscape, equals(r'{"a": "caf\u0061"}'));
+      expect(jsonDecode(completeEscape), equals({'a': 'cafa'}));
+
+      // Escaped backslash before u00 (even backslashes) is not stripped
+      final escapedBackslash = direct.repairJson(r'{"a": "caf\\u00');
+      expect(escapedBackslash, equals(r'{"a": "caf\\u00"}'));
+      expect(jsonDecode(escapedBackslash), equals({'a': r'caf\u00'}));
+
+      // Odd backslash sequence precedes incomplete unicode escape
+      final oddBackslash = direct.repairJson(r'{"a": "caf\\\u00');
+      expect(oddBackslash, equals(r'{"a": "caf\\"}'));
+      expect(jsonDecode(oddBackslash), equals({'a': r'caf\'}));
+
+      // String boundary: entire value is incomplete unicode escape
+      final emptyRemainder = direct.repairJson(r'{"a": "\u00');
+      expect(emptyRemainder, equals('{"a": ""}'));
+      expect(jsonDecode(emptyRemainder), equals({'a': ''}));
+
+      // Array elements with truncated unicode escape
+      final arrayElement = direct.repairJson(r'["caf\u00');
+      expect(arrayElement, equals('["caf"]'));
+      expect(jsonDecode(arrayElement), equals(['caf']));
+
+      // Root string with truncated unicode escape
+      final rootString = direct.repairJson(r'"caf\u00');
+      expect(rootString, equals('"caf"'));
+      expect(jsonDecode(rootString), equals('caf'));
+
+      // Incomplete object key with truncated unicode escape is rolled back
+      final incompleteKey = direct.repairJson(r'{"incomp\u00');
+      expect(incompleteKey, equals('{}'));
+      expect(jsonDecode(incompleteKey), equals(<String, dynamic>{}));
+    });
+
     test('batches contiguous whitespace runs across objects and arrays', () {
       const whitespaceHeavy =
           '  \t \r\n  {\r\n\t  "key"  \t :  \r\n  [  \n\t  1  ,  \t\r\n  2  \t  ]  \r\n  }  \t\r\n  ';

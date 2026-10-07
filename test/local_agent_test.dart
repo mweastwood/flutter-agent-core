@@ -2839,6 +2839,12 @@ void main() {
       final repairedArr = repairJson(truncatedArr);
       expect(repairedArr, equals('["item1", "item2 unclosed"]'));
       expect(jsonDecode(repairedArr), equals(['item1', 'item2 unclosed']));
+
+      // Truncated string literal with incomplete unicode escape
+      final truncatedUnicode = r'{"a": "caf\u00';
+      final repairedUnicode = repairJson(truncatedUnicode);
+      expect(repairedUnicode, equals('{"a": "caf"}'));
+      expect(jsonDecode(repairedUnicode), equals({'a': 'caf'}));
     });
   });
 }
