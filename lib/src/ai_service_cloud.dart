@@ -40,6 +40,8 @@ class CloudAiService extends AiService {
     this.enableJitter = true,
     http.Client? httpClient,
     Random? random,
+    @visibleForTesting RateLimiter? rateLimiter,
+    @visibleForTesting DateTime Function()? nowProvider,
   })  : _httpClient = httpClient ?? http.Client(),
         _ownsHttpClient = httpClient == null,
         _random = random,
@@ -51,15 +53,20 @@ class CloudAiService extends AiService {
           'Authorization':
               'Bearer ${apiKey.replaceAll(_reNonAscii, '').trim()}',
         }),
-        _rateLimiter = (() {
-          final info = CloudModelDatabase.getModelInfo(modelName);
-          return info != null
-              ? RateLimiter(
-                  modelInfo: info,
-                  throttlePercentage: throttlePercentage,
-                )
-              : null;
-        })();
+        _rateLimiter = rateLimiter ??
+            (() {
+              final info = CloudModelDatabase.getModelInfo(modelName);
+              return info != null
+                  ? RateLimiter(
+                      modelInfo: info,
+                      throttlePercentage: throttlePercentage,
+                      nowProvider: nowProvider,
+                    )
+                  : null;
+            })();
+
+  @visibleForTesting
+  RateLimiter? get rateLimiter => _rateLimiter;
 
   /// Closes the internal [http.Client] if it was created and owned by this instance.
   @override
