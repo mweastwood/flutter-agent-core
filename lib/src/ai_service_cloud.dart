@@ -47,13 +47,15 @@ final RegExp _asctimeRegex = RegExp(
   caseSensitive: false,
 );
 
+final RegExp _digitsOnlyRegex = RegExp(r'^\d+$');
+
 /// Parses an RFC 9110 / RFC 7231 HTTP-date string into a UTC [DateTime].
 ///
 /// Supports IMF-fixdate (e.g. `Sun, 06 Nov 1994 08:49:37 GMT`),
 /// RFC 850 format (e.g. `Sunday, 06-Nov-94 08:49:37 GMT`), and
 /// ANSI C asctime() format (e.g. `Sun Nov  6 08:49:37 1994`).
 /// Returns `null` if the date string is malformed or invalid.
-DateTime? tryParseHttpDate(String dateString) {
+DateTime? _tryParseHttpDate(String dateString) {
   final trimmed = dateString.trim();
   if (trimmed.isEmpty) return null;
 
@@ -177,6 +179,10 @@ class CloudAiService extends AiService {
   final Random? _random;
   final DateTime Function() _nowProvider;
 
+  /// Creates a [CloudAiService] instance.
+  ///
+  /// [nowProvider] is an optional injectable clock callback used for
+  /// deterministic testing of time-dependent headers.
   CloudAiService({
     required this.baseUrl,
     required this.apiKey,
@@ -252,7 +258,33 @@ class CloudAiService extends AiService {
 
   @visibleForTesting
   static DateTime? parseHttpDate(String dateString) =>
-      tryParseHttpDate(dateString);
+      _tryParseHttpDate(dateString);
+
+  Duration? _parseRetryAfter(String retryAfterStr, {DateTime? now}) {
+    final trimmed = retryAfterStr.trim();
+    final seconds = int.tryParse(trimmed);
+    if (seconds != null) {
+      if (seconds < 0) return null;
+      if (seconds > maxRetryDelay.inSeconds) return maxRetryDelay;
+      final candidate = Duration(seconds: seconds);
+      return candidate > maxRetryDelay ? maxRetryDelay : candidate;
+    }
+
+    // Handle positive integer seconds that exceed 64-bit int max
+    if (_digitsOnlyRegex.hasMatch(trimmed)) {
+      return maxRetryDelay;
+    }
+
+    final targetDate = _tryParseHttpDate(trimmed);
+    if (targetDate != null) {
+      final currentTime = now ?? _nowProvider();
+      final diff = targetDate.difference(currentTime);
+      if (diff.isNegative) return Duration.zero;
+      return diff > maxRetryDelay ? maxRetryDelay : diff;
+    }
+
+    return null;
+  }
 
   @visibleForTesting
   Duration calculateBackoff(
@@ -276,34 +308,8 @@ class CloudAiService extends AiService {
         }
       }
       if (retryAfterStr != null) {
-        final trimmed = retryAfterStr.trim();
-        final seconds = int.tryParse(trimmed);
-        Duration? delay;
-        if (seconds != null) {
-          if (seconds >= 0) {
-            if (seconds > maxRetryDelay.inSeconds) {
-              delay = maxRetryDelay;
-            } else {
-              final candidate = Duration(seconds: seconds);
-              delay = candidate > maxRetryDelay ? maxRetryDelay : candidate;
-            }
-          }
-        } else {
-          final targetDate = tryParseHttpDate(trimmed);
-          if (targetDate != null) {
-            final currentTime = now ?? _nowProvider();
-            final diff = targetDate.difference(currentTime);
-            delay = diff.isNegative ? Duration.zero : diff;
-          }
-        }
-
+        final delay = _parseRetryAfter(retryAfterStr, now: now);
         if (delay != null) {
-          if (delay > maxRetryDelay) {
-            return maxRetryDelay;
-          }
-          if (delay < Duration.zero) {
-            return Duration.zero;
-          }
           return delay;
         }
       }

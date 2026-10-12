@@ -564,47 +564,49 @@ void main() {
     });
 
     test(
-        'forwards visualInput from delegate.getVisualInput to aiService.generateContent',
-        () async {
-      final imagePayload = Uint8List.fromList([1, 2, 3, 4, 5]);
-      final mockAi = TestMockAiService([
-        {'action': 'increment', 'tool': 'inc'},
-        {'action': 'stop', 'tool': 'finish'},
-      ]);
-      final delegate = MockTextAgentDelegate(visualInput: imagePayload);
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'forwards visualInput from delegate.getVisualInput to aiService.generateContent',
+      () async {
+        final imagePayload = Uint8List.fromList([1, 2, 3, 4, 5]);
+        final mockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate(visualInput: imagePayload);
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'test visual',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'test visual',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(2));
-      expect(mockAi.capturedImageBytes.length, equals(2));
-      expect(mockAi.capturedImageBytes[0], equals(imagePayload));
-      expect(mockAi.capturedImageBytes[1], equals(imagePayload));
-    });
+        expect(steps.length, equals(2));
+        expect(mockAi.capturedImageBytes.length, equals(2));
+        expect(mockAi.capturedImageBytes[0], equals(imagePayload));
+        expect(mockAi.capturedImageBytes[1], equals(imagePayload));
+      },
+    );
 
     test(
-        'forwards null imageBytes to aiService.generateContent when visualInput is omitted or null',
-        () async {
-      final mockAi = TestMockAiService([
-        {'action': 'stop', 'tool': 'finish'},
-      ]);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'forwards null imageBytes to aiService.generateContent when visualInput is omitted or null',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      await harness.runLoop(userPrompt: 'test null visual');
+        await harness.runLoop(userPrompt: 'test null visual');
 
-      expect(mockAi.capturedImageBytes.length, equals(1));
-      expect(mockAi.capturedImageBytes.first, isNull);
-    });
+        expect(mockAi.capturedImageBytes.length, equals(1));
+        expect(mockAi.capturedImageBytes.first, isNull);
+      },
+    );
 
     test(
       'forwards custom temperature parameter to aiService.generateContent',
@@ -618,7 +620,10 @@ void main() {
           delegate: delegate,
         );
 
-        await harness.runLoop(userPrompt: 'test temperature', temperature: 0.2);
+        await harness.runLoop(
+          userPrompt: 'test temperature',
+          temperature: 0.2,
+        );
 
         expect(mockAi.capturedTemperatures.length, equals(1));
         expect(mockAi.capturedTemperatures.first, equals(0.2));
@@ -683,87 +688,96 @@ void main() {
     });
 
     test(
-        'handles non-Map JSON response (TypeError on cast) and terminates with error step',
-        () async {
-      final mockAi = _RawStringMockAiService(['[{"action": "test"}]']);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'handles non-Map JSON response (TypeError on cast) and terminates with error step',
+      () async {
+        final mockAi = _RawStringMockAiService(['[{"action": "test"}]']);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'test non-map json',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'test non-map json',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(1));
-      expect(steps[0].feedback, startsWith('Error: '));
-      expect(
-        steps[0].feedback,
-        anyOf(contains('is not a subtype of type'), contains('TypeError')),
-      );
-      expect(steps[0].feedback, contains('Map<String, dynamic>'));
-      expect(steps[0].isFinish, isFalse);
-      expect(steps[0].tool, isEmpty);
-      expect(delegate.actionsApplied, isEmpty);
-      expect(mockAi.callCount, equals(1));
-    });
-
-    test(
-        'handles scalar JSON response (TypeError on cast) and terminates with error step',
-        () async {
-      final mockAi = _RawStringMockAiService(['"done"']);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
-
-      final steps = await harness.runLoop(
-        userPrompt: 'test scalar json',
-        maxSteps: 5,
-      );
-
-      expect(steps.length, equals(1));
-      expect(steps[0].feedback, startsWith('Error: '));
-      expect(
-        steps[0].feedback,
-        anyOf(contains('is not a subtype of type'), contains('TypeError')),
-      );
-      expect(steps[0].feedback, contains('Map<String, dynamic>'));
-      expect(steps[0].isFinish, isFalse);
-      expect(steps[0].tool, isEmpty);
-      expect(delegate.actionsApplied, isEmpty);
-      expect(mockAi.callCount, equals(1));
-    });
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, startsWith('Error: '));
+        expect(
+          steps[0].feedback,
+          anyOf(
+            contains('is not a subtype of type'),
+            contains('TypeError'),
+          ),
+        );
+        expect(steps[0].feedback, contains('Map<String, dynamic>'));
+        expect(steps[0].isFinish, isFalse);
+        expect(steps[0].tool, isEmpty);
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
 
     test(
-        'terminates on step 1 when initial action is finish without invoking applyAction',
-        () async {
-      final mockAi = TestMockAiService([
-        {'action': 'stop', 'tool': 'finish'},
-        {'action': 'increment', 'tool': 'inc'},
-      ]);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+      'handles scalar JSON response (TypeError on cast) and terminates with error step',
+      () async {
+        final mockAi = _RawStringMockAiService(['"done"']);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      final steps = await harness.runLoop(
-        userPrompt: 'finish right away',
-        maxSteps: 5,
-      );
+        final steps = await harness.runLoop(
+          userPrompt: 'test scalar json',
+          maxSteps: 5,
+        );
 
-      expect(steps.length, equals(1));
-      expect(steps[0].tool, equals('finish'));
-      expect(steps[0].feedback, equals('Finished.'));
-      expect(steps[0].isFinish, isTrue);
-      expect(delegate.actionsApplied, isEmpty);
-      expect(delegate.counter, equals(0));
-      expect(mockAi.callCount, equals(1));
-    });
+        expect(steps.length, equals(1));
+        expect(steps[0].feedback, startsWith('Error: '));
+        expect(
+          steps[0].feedback,
+          anyOf(
+            contains('is not a subtype of type'),
+            contains('TypeError'),
+          ),
+        );
+        expect(steps[0].feedback, contains('Map<String, dynamic>'));
+        expect(steps[0].isFinish, isFalse);
+        expect(steps[0].tool, isEmpty);
+        expect(delegate.actionsApplied, isEmpty);
+        expect(mockAi.callCount, equals(1));
+      },
+    );
+
+    test(
+      'terminates on step 1 when initial action is finish without invoking applyAction',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+          {'action': 'increment', 'tool': 'inc'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final steps = await harness.runLoop(
+          userPrompt: 'finish right away',
+          maxSteps: 5,
+        );
+
+        expect(steps.length, equals(1));
+        expect(steps[0].tool, equals('finish'));
+        expect(steps[0].feedback, equals('Finished.'));
+        expect(steps[0].isFinish, isTrue);
+        expect(delegate.actionsApplied, isEmpty);
+        expect(delegate.counter, equals(0));
+        expect(mockAi.callCount, equals(1));
+      },
+    );
   });
 
   group('AgentHistoryEntry Serialization Tests', () {
@@ -2325,6 +2339,17 @@ void main() {
           equals(const Duration(seconds: 15)),
         );
 
+        // Numeric seconds exceeding 64-bit int max (int.tryParse returns null)
+        final responseExceeding64Bit = http.Response(
+          'Too Many Requests',
+          429,
+          headers: {'Retry-After': '99999999999999999999999999999999'},
+        );
+        expect(
+          service.calculateBackoff(1, responseExceeding64Bit),
+          equals(const Duration(seconds: 15)),
+        );
+
         final serviceCustomMax = CloudAiService(
           baseUrl: 'https://api.gemini.com/v1',
           apiKey: 'test-key',
@@ -2979,13 +3004,181 @@ void main() {
     });
 
     test(
-        'enforces RPS rate limiting delay between consecutive requests with fakeAsync',
-        () {
-      fakeAsync((async) {
-        final clock = async.getClock(DateTime(2026, 1, 1));
-        final dispatchTimes = <Duration>[];
+      'enforces RPS rate limiting delay between consecutive requests with fakeAsync',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+          final dispatchTimes = <Duration>[];
+          final mockClient = MockHttpClient((request) async {
+            dispatchTimes.add(async.elapsed);
+            return http.Response(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'role': 'assistant', 'content': 'ok'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              }),
+              200,
+            );
+          });
+
+          final service = CloudAiService(
+            baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+            apiKey: 'test-key',
+            modelName: 'glm-4.7-flash',
+            httpClient: mockClient,
+            nowProvider: () => clock.now(),
+          );
+
+          expect(service.rateLimiter, isNotNull);
+          expect(service.rateLimiter!.modelInfo.limitRps, equals(2));
+
+          AiResponse? res1;
+          AiResponse? res2;
+
+          service.generateContentRaw(prompt: 'req1').then((res) => res1 = res);
+          async.flushMicrotasks();
+          expect(res1, isNotNull);
+          expect(dispatchTimes, equals([Duration.zero]));
+
+          service.generateContentRaw(prompt: 'req2').then((res) => res2 = res);
+          async.flushMicrotasks();
+          expect(res2, isNull);
+          expect(dispatchTimes.length, equals(1));
+
+          // At 250ms, the second request remains pending
+          async.elapse(const Duration(milliseconds: 250));
+          async.flushMicrotasks();
+          expect(res2, isNull);
+          expect(dispatchTimes.length, equals(1));
+
+          // At 500ms (another 250ms), the second request dispatches
+          async.elapse(const Duration(milliseconds: 250));
+          async.flushMicrotasks();
+          expect(res2, isNotNull);
+          expect(dispatchTimes.length, equals(2));
+          expect(dispatchTimes[1], equals(const Duration(milliseconds: 500)));
+        });
+      },
+    );
+
+    test(
+      'honors throttlePercentage configuration: disables throttling when 0% and scales interval when throttled',
+      () {
+        fakeAsync((async) {
+          final clock = async.getClock(DateTime(2026, 1, 1));
+
+          // 1. throttlePercentage: 0.0 disables throttling
+          final dispatchTimes0 = <Duration>[];
+          final mockClient0 = MockHttpClient((request) async {
+            dispatchTimes0.add(async.elapsed);
+            return http.Response(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'role': 'assistant', 'content': 'ok'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              }),
+              200,
+            );
+          });
+
+          final serviceDisabled = CloudAiService(
+            baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+            apiKey: 'test-key',
+            modelName: 'glm-4.7-flash',
+            throttlePercentage: 0.0,
+            httpClient: mockClient0,
+            nowProvider: () => clock.now(),
+          );
+
+          expect(serviceDisabled.rateLimiter, isNotNull);
+          expect(serviceDisabled.rateLimiter!.throttlePercentage, equals(0.0));
+
+          AiResponse? res0_1;
+          AiResponse? res0_2;
+          serviceDisabled
+              .generateContentRaw(prompt: 'req1')
+              .then((res) => res0_1 = res);
+          serviceDisabled
+              .generateContentRaw(prompt: 'req2')
+              .then((res) => res0_2 = res);
+          async.flushMicrotasks();
+
+          expect(res0_1, isNotNull);
+          expect(res0_2, isNotNull);
+          expect(dispatchTimes0, equals([Duration.zero, Duration.zero]));
+
+          // 2. throttlePercentage: 50.0 scales 2 RPS to 1 RPS (1000ms delay)
+          final dispatchTimes50 = <Duration>[];
+          final mockClient50 = MockHttpClient((request) async {
+            dispatchTimes50.add(async.elapsed);
+            return http.Response(
+              jsonEncode({
+                'choices': [
+                  {
+                    'message': {'role': 'assistant', 'content': 'ok'},
+                    'finish_reason': 'stop',
+                  },
+                ],
+              }),
+              200,
+            );
+          });
+
+          final service50 = CloudAiService(
+            baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+            apiKey: 'test-key',
+            modelName: 'glm-4.7-flash',
+            throttlePercentage: 50.0,
+            httpClient: mockClient50,
+            nowProvider: () => clock.now(),
+          );
+
+          expect(service50.rateLimiter, isNotNull);
+          expect(service50.rateLimiter!.throttlePercentage, equals(50.0));
+
+          AiResponse? res50_1;
+          AiResponse? res50_2;
+          service50
+              .generateContentRaw(prompt: 'req1')
+              .then((res) => res50_1 = res);
+          async.flushMicrotasks();
+          expect(res50_1, isNotNull);
+
+          service50
+              .generateContentRaw(prompt: 'req2')
+              .then((res) => res50_2 = res);
+          async.flushMicrotasks();
+          expect(res50_2, isNull);
+
+          // After 500ms, should still be pending because effective interval is 1000ms
+          async.elapse(const Duration(milliseconds: 500));
+          async.flushMicrotasks();
+          expect(res50_2, isNull);
+          expect(dispatchTimes50.length, equals(1));
+
+          // After another 500ms (1000ms total), dispatches
+          async.elapse(const Duration(milliseconds: 500));
+          async.flushMicrotasks();
+          expect(res50_2, isNotNull);
+          expect(dispatchTimes50.length, equals(2));
+          expect(
+            dispatchTimes50[1],
+            equals(const Duration(milliseconds: 1000)),
+          );
+        });
+      },
+    );
+
+    test(
+      'calculates token estimates via countTokens and forwards to rateLimiter for TPM tracking',
+      () async {
         final mockClient = MockHttpClient((request) async {
-          dispatchTimes.add(async.elapsed);
           return http.Response(
             jsonEncode({
               'choices': [
@@ -3000,210 +3193,48 @@ void main() {
         });
 
         final service = CloudAiService(
-          baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+          baseUrl: 'https://api.example.com',
           apiKey: 'test-key',
-          modelName: 'glm-4.7-flash',
+          modelName: 'gemini-3.6-flash',
           httpClient: mockClient,
-          nowProvider: () => clock.now(),
         );
 
         expect(service.rateLimiter, isNotNull);
-        expect(service.rateLimiter!.modelInfo.limitRps, equals(2));
+        expect(service.rateLimiter!.runningTokenSum, equals(0));
 
-        AiResponse? res1;
-        AiResponse? res2;
+        final prompt =
+            'Hello world, testing rate limiter token estimation forwarding';
+        final expectedPromptTokens = await service.countTokens(prompt: prompt);
+        expect(expectedPromptTokens, greaterThan(0));
 
-        service.generateContentRaw(prompt: 'req1').then((res) => res1 = res);
-        async.flushMicrotasks();
+        final res1 = await service.generateContentRaw(prompt: prompt);
         expect(res1, isNotNull);
-        expect(dispatchTimes, equals([Duration.zero]));
+        expect(res1!.isError, isFalse);
+        expect(
+          service.rateLimiter!.runningTokenSum,
+          equals(expectedPromptTokens),
+        );
 
-        service.generateContentRaw(prompt: 'req2').then((res) => res2 = res);
-        async.flushMicrotasks();
-        expect(res2, isNull);
-        expect(dispatchTimes.length, equals(1));
+        // Multimodal request with imageBytes
+        final imageBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
+        final expectedMultimodalTokens = await service.countTokens(
+          prompt: 'Describe this image',
+          imageBytes: imageBytes,
+        );
+        expect(expectedMultimodalTokens, greaterThan(256));
 
-        // At 250ms, the second request remains pending
-        async.elapse(const Duration(milliseconds: 250));
-        async.flushMicrotasks();
-        expect(res2, isNull);
-        expect(dispatchTimes.length, equals(1));
-
-        // At 500ms (another 250ms), the second request dispatches
-        async.elapse(const Duration(milliseconds: 250));
-        async.flushMicrotasks();
+        final res2 = await service.generateContentRaw(
+          prompt: 'Describe this image',
+          imageBytes: imageBytes,
+        );
         expect(res2, isNotNull);
-        expect(dispatchTimes.length, equals(2));
-        expect(dispatchTimes[1], equals(const Duration(milliseconds: 500)));
-      });
-    });
-
-    test(
-        'honors throttlePercentage configuration: disables throttling when 0% and scales interval when throttled',
-        () {
-      fakeAsync((async) {
-        final clock = async.getClock(DateTime(2026, 1, 1));
-
-        // 1. throttlePercentage: 0.0 disables throttling
-        final dispatchTimes0 = <Duration>[];
-        final mockClient0 = MockHttpClient((request) async {
-          dispatchTimes0.add(async.elapsed);
-          return http.Response(
-            jsonEncode({
-              'choices': [
-                {
-                  'message': {'role': 'assistant', 'content': 'ok'},
-                  'finish_reason': 'stop',
-                },
-              ],
-            }),
-            200,
-          );
-        });
-
-        final serviceDisabled = CloudAiService(
-          baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-          apiKey: 'test-key',
-          modelName: 'glm-4.7-flash',
-          throttlePercentage: 0.0,
-          httpClient: mockClient0,
-          nowProvider: () => clock.now(),
+        expect(res2!.isError, isFalse);
+        expect(
+          service.rateLimiter!.runningTokenSum,
+          equals(expectedPromptTokens + expectedMultimodalTokens),
         );
-
-        expect(serviceDisabled.rateLimiter, isNotNull);
-        expect(serviceDisabled.rateLimiter!.throttlePercentage, equals(0.0));
-
-        AiResponse? res0_1;
-        AiResponse? res0_2;
-        serviceDisabled
-            .generateContentRaw(prompt: 'req1')
-            .then((res) => res0_1 = res);
-        serviceDisabled
-            .generateContentRaw(prompt: 'req2')
-            .then((res) => res0_2 = res);
-        async.flushMicrotasks();
-
-        expect(res0_1, isNotNull);
-        expect(res0_2, isNotNull);
-        expect(dispatchTimes0, equals([Duration.zero, Duration.zero]));
-
-        // 2. throttlePercentage: 50.0 scales 2 RPS to 1 RPS (1000ms delay)
-        final dispatchTimes50 = <Duration>[];
-        final mockClient50 = MockHttpClient((request) async {
-          dispatchTimes50.add(async.elapsed);
-          return http.Response(
-            jsonEncode({
-              'choices': [
-                {
-                  'message': {'role': 'assistant', 'content': 'ok'},
-                  'finish_reason': 'stop',
-                },
-              ],
-            }),
-            200,
-          );
-        });
-
-        final service50 = CloudAiService(
-          baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
-          apiKey: 'test-key',
-          modelName: 'glm-4.7-flash',
-          throttlePercentage: 50.0,
-          httpClient: mockClient50,
-          nowProvider: () => clock.now(),
-        );
-
-        expect(service50.rateLimiter, isNotNull);
-        expect(service50.rateLimiter!.throttlePercentage, equals(50.0));
-
-        AiResponse? res50_1;
-        AiResponse? res50_2;
-        service50
-            .generateContentRaw(prompt: 'req1')
-            .then((res) => res50_1 = res);
-        async.flushMicrotasks();
-        expect(res50_1, isNotNull);
-
-        service50
-            .generateContentRaw(prompt: 'req2')
-            .then((res) => res50_2 = res);
-        async.flushMicrotasks();
-        expect(res50_2, isNull);
-
-        // After 500ms, should still be pending because effective interval is 1000ms
-        async.elapse(const Duration(milliseconds: 500));
-        async.flushMicrotasks();
-        expect(res50_2, isNull);
-        expect(dispatchTimes50.length, equals(1));
-
-        // After another 500ms (1000ms total), dispatches
-        async.elapse(const Duration(milliseconds: 500));
-        async.flushMicrotasks();
-        expect(res50_2, isNotNull);
-        expect(dispatchTimes50.length, equals(2));
-        expect(dispatchTimes50[1], equals(const Duration(milliseconds: 1000)));
-      });
-    });
-
-    test(
-        'calculates token estimates via countTokens and forwards to rateLimiter for TPM tracking',
-        () async {
-      final mockClient = MockHttpClient((request) async {
-        return http.Response(
-          jsonEncode({
-            'choices': [
-              {
-                'message': {'role': 'assistant', 'content': 'ok'},
-                'finish_reason': 'stop',
-              },
-            ],
-          }),
-          200,
-        );
-      });
-
-      final service = CloudAiService(
-        baseUrl: 'https://api.example.com',
-        apiKey: 'test-key',
-        modelName: 'gemini-3.6-flash',
-        httpClient: mockClient,
-      );
-
-      expect(service.rateLimiter, isNotNull);
-      expect(service.rateLimiter!.runningTokenSum, equals(0));
-
-      final prompt =
-          'Hello world, testing rate limiter token estimation forwarding';
-      final expectedPromptTokens = await service.countTokens(prompt: prompt);
-      expect(expectedPromptTokens, greaterThan(0));
-
-      final res1 = await service.generateContentRaw(prompt: prompt);
-      expect(res1, isNotNull);
-      expect(res1!.isError, isFalse);
-      expect(
-        service.rateLimiter!.runningTokenSum,
-        equals(expectedPromptTokens),
-      );
-
-      // Multimodal request with imageBytes
-      final imageBytes = Uint8List.fromList([1, 2, 3, 4, 5]);
-      final expectedMultimodalTokens = await service.countTokens(
-        prompt: 'Describe this image',
-        imageBytes: imageBytes,
-      );
-      expect(expectedMultimodalTokens, greaterThan(256));
-
-      final res2 = await service.generateContentRaw(
-        prompt: 'Describe this image',
-        imageBytes: imageBytes,
-      );
-      expect(res2, isNotNull);
-      expect(res2!.isError, isFalse);
-      expect(
-        service.rateLimiter!.runningTokenSum,
-        equals(expectedPromptTokens + expectedMultimodalTokens),
-      );
-    });
+      },
+    );
 
     test(
       'gracefully bypasses rate limiting for unregistered or unknown models',
