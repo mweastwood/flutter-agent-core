@@ -13,6 +13,10 @@ class MethodChannelAiService extends AiService {
   final int maxRetries;
   final Duration initialRetryDelay;
   final Duration maxRetryDelay;
+
+  /// Maximum time to wait for a single platform channel call before it is aborted
+  /// with a [TimeoutException] and handled by the retry loop.
+  final Duration requestTimeout;
   final bool enableJitter;
   final Random? random;
 
@@ -21,6 +25,7 @@ class MethodChannelAiService extends AiService {
     this.maxRetries = 3,
     this.initialRetryDelay = const Duration(milliseconds: 500),
     this.maxRetryDelay = const Duration(seconds: 15),
+    this.requestTimeout = const Duration(seconds: 60),
     this.enableJitter = true,
     this.random,
   });
@@ -107,7 +112,7 @@ class MethodChannelAiService extends AiService {
             'image': imageBytes,
             'temperature': temperature,
             'maxOutputTokens': maxOutputTokens,
-          });
+          }).timeout(requestTimeout);
           lastError = null;
           lastStackTrace = null;
           break; // Success! Exit the retry loop.

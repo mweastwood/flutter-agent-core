@@ -30,7 +30,9 @@ void main() {
           .timeout(const Duration(seconds: 5));
 
       expect(calls, 2);
-      expect(response.error, isA<TimeoutException>());
+      expect(response, isNotNull);
+      expect(response!.isError, isTrue);
+      expect(response.text, contains('TimeoutException'));
     });
   });
 }

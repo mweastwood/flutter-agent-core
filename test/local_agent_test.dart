@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -1449,6 +1450,35 @@ void main() {
           expect(response!.isError, isTrue);
           expect(response.isTruncated, isFalse);
           expect(response.text, contains('"error"'));
+        },
+      );
+
+      test(
+        'stalled platform call times out, retries, and returns an error',
+        () async {
+          int attempts = 0;
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(channel, (MethodCall methodCall) {
+            attempts++;
+            return Completer<dynamic>().future; // never completes
+          });
+
+          final service = MethodChannelAiService(
+            maxRetries: 1,
+            initialRetryDelay: Duration.zero,
+            maxRetryDelay: Duration.zero,
+            enableJitter: false,
+            requestTimeout: const Duration(milliseconds: 50),
+          );
+
+          final response = await service
+              .generateContentRaw(prompt: 'test prompt')
+              .timeout(const Duration(seconds: 5));
+
+          expect(attempts, equals(2));
+          expect(response, isNotNull);
+          expect(response!.isError, isTrue);
+          expect(response.text, contains('TimeoutException'));
         },
       );
     });
