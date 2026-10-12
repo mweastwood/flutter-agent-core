@@ -35,7 +35,6 @@ final _reJsonNumber = RegExp(r'^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$');
 final _incompleteUnicodeEscape =
     RegExp(r'(?:^|[^\\])(?:\\\\)*(\\u[0-9a-fA-F]{0,3})$');
 
-
 bool _isValidJsonLiteral(String token) {
   if (token == 'true' || token == 'false' || token == 'null') {
     return true;

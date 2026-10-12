@@ -290,8 +290,7 @@ void main() {
       expect(jsonDecode(escapedQuote), equals({'message': 'He said "hello'}));
     });
 
-    test(
-        'repairs unclosed strings with truncated unicode escape sequences',
+    test('repairs unclosed strings with truncated unicode escape sequences',
         () {
       // Truncation with \u (0 hex digits)
       final u0 = direct.repairJson(r'{"a": "caf\u');
