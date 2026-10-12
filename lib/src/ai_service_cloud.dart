@@ -325,22 +325,14 @@ class CloudAiService extends AiService {
     try {
       response = await _postWithRetry(body);
     } catch (e) {
-      return AiResponse(
-        text: '{"error": "${e.toString().replaceAll('"', '\\"')}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error(e);
     }
 
     if (response.statusCode != 200) {
       debugPrint(
         'CloudAiService error response: ${response.statusCode} - ${response.body}',
       );
-      return AiResponse(
-        text: '{"error": "Server returned code ${response.statusCode}"}',
-        isTruncated: false,
-        isError: true,
-      );
+      return AiResponse.error('Server returned code ${response.statusCode}');
     }
 
     return _parseResponse(

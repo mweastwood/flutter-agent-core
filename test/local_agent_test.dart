@@ -3247,6 +3247,51 @@ void main() {
       expect(response.isTruncated, isFalse);
       expect(response.text, contains('error'));
     });
+
+    test(
+        'generateContentRaw returns AiResponse.error on postWithRetry network failure',
+        () async {
+      final mockClient = MockHttpClient((request) async {
+        throw http.ClientException('Network down');
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+        maxRetries: 0,
+        httpClient: mockClient,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'test');
+      expect(response, isNotNull);
+      expect(response!.isError, isTrue);
+      expect(response.isTruncated, isFalse);
+      final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+      expect(decoded['error'], contains('Network down'));
+    });
+
+    test('generateContentRaw returns AiResponse.error on non-200 HTTP response',
+        () async {
+      final mockClient = MockHttpClient((request) async {
+        return http.Response('Forbidden', 403);
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'test-model',
+        maxRetries: 0,
+        httpClient: mockClient,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'test');
+      expect(response, isNotNull);
+      expect(response!.isError, isTrue);
+      expect(response.isTruncated, isFalse);
+      final decoded = jsonDecode(response.text) as Map<String, dynamic>;
+      expect(decoded['error'], equals('Server returned code 403'));
+    });
   });
 
   group('Heuristic & Chunk Cleaning Tests', () {
