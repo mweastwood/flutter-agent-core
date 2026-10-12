@@ -34,5 +34,28 @@ void main() {
       expect(response!.isError, isTrue);
       expect(response.text, contains('TimeoutException'));
     });
+
+    test('fast POST completes successfully within requestTimeout', () async {
+      final client = MockClient((request) async {
+        return http.Response(
+          '{"choices": [{"message": {"role": "assistant", "content": "Hello from cloud"}, "finish_reason": "stop"}]}',
+          200,
+        );
+      });
+
+      final service = CloudAiService(
+        baseUrl: 'https://example.com/v1',
+        apiKey: 'key',
+        modelName: 'model',
+        requestTimeout: const Duration(seconds: 5),
+        httpClient: client,
+      );
+
+      final response = await service.generateContentRaw(prompt: 'hi');
+
+      expect(response, isNotNull);
+      expect(response!.isError, isFalse);
+      expect(response.text, equals('Hello from cloud'));
+    });
   });
 }
