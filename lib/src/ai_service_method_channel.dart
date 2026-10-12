@@ -14,8 +14,8 @@ class MethodChannelAiService extends AiService {
   final Duration initialRetryDelay;
   final Duration maxRetryDelay;
 
-  /// Maximum time to wait for a single platform channel call before it is aborted
-  /// with a [TimeoutException] and handled by the retry loop.
+  /// Maximum time to wait for a single platform channel call before it is
+  /// aborted with a [TimeoutException] and handled by the retry loop.
   final Duration requestTimeout;
   final bool enableJitter;
   final Random? random;
