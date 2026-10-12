@@ -3191,6 +3191,44 @@ void main() {
       expect(response.totalTokens, equals(25 + response.outputTokens!));
     });
 
+    test(
+        'parseResponse handles token fallback counting when usage is missing and imageBytes is provided',
+        () async {
+      final service = CloudAiService(
+        baseUrl: 'https://api.example.com',
+        apiKey: 'test-key',
+        modelName: 'gemini-1.5-flash',
+      );
+
+      final httpResponse = http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'role': 'assistant', 'content': 'Sample output'},
+              'finish_reason': 'stop',
+            },
+          ],
+        }),
+        200,
+      );
+
+      final imageBytes = Uint8List.fromList([1, 2, 3, 4]);
+      final response = await service.parseResponse(
+        response: httpResponse,
+        prompt: 'Short prompt',
+        imageBytes: imageBytes,
+      );
+
+      final expectedInputTokens =
+          AiService.estimateTokenCount('Short prompt', imageBytes: imageBytes);
+      expect(response, isNotNull);
+      expect(response!.text, equals('Sample output'));
+      expect(response.inputTokens, equals(expectedInputTokens));
+      expect(response.outputTokens, isNotNull);
+      expect(response.totalTokens,
+          equals(expectedInputTokens + response.outputTokens!));
+    });
+
     test('parseResponse marks isTruncated true when finish_reason is length',
         () async {
       final service = CloudAiService(

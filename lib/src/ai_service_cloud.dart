@@ -14,6 +14,8 @@ final _reNonAscii = RegExp(r'[^\x00-\x7F]');
 final _trailingSlashesRegex = RegExp(r'/+$');
 
 class CloudAiService extends AiService {
+  /// HTTP status codes representing transient server or rate limiting errors
+  /// that are eligible for retry attempts (429, 500, 502, 503, 504).
   @visibleForTesting
   static const Set<int> retryableStatusCodes = {429, 500, 502, 503, 504};
 
@@ -134,6 +136,10 @@ class CloudAiService extends AiService {
     );
   }
 
+  /// Constructs the JSON request body string for OpenAI-compatible chat completion endpoints.
+  ///
+  /// Formats the [prompt] and optional [imageBytes] into the messages payload,
+  /// and applies the specified [temperature] and optional [maxOutputTokens].
   @visibleForTesting
   String buildRequestBody({
     required String prompt,
@@ -166,14 +172,17 @@ class CloudAiService extends AiService {
     });
   }
 
+  /// Sends the HTTP POST request to the chat completion endpoint with retry and backoff.
+  ///
+  /// Retries up to [maxRetries] times when encountering transient network errors
+  /// or retryable HTTP status codes ([retryableStatusCodes]). Returns the last
+  /// [http.Response] (which may have a non-200 status code if retries were exhausted
+  /// or if the status code was non-retryable), or rethrows the underlying exception
+  /// on terminal network failure.
   @visibleForTesting
   Future<http.Response> postWithRetry(String body) => _postWithRetry(body);
 
   Future<http.Response> _postWithRetry(String body) async {
-    Object? lastError;
-    StackTrace? lastStackTrace;
-    http.Response? lastResponse;
-
     final totalAttempts = maxRetries > 0 ? maxRetries + 1 : 1;
 
     for (int attempt = 1; attempt <= totalAttempts; attempt++) {
@@ -183,10 +192,6 @@ class CloudAiService extends AiService {
           headers: _headers,
           body: body,
         );
-
-        lastResponse = response;
-        lastError = null;
-        lastStackTrace = null;
 
         if (response.statusCode == 200) {
           return response;
@@ -204,34 +209,33 @@ class CloudAiService extends AiService {
         final backoff = _calculateBackoff(attempt, response);
         await Future.delayed(backoff);
       } catch (e, stack) {
-        lastError = e;
-        lastStackTrace = stack;
+        if (attempt == totalAttempts) {
+          debugPrint(
+            'Error in CloudAiService post request: $e\n$stack',
+          );
+          Error.throwWithStackTrace(e, stack);
+        }
+
         debugPrint(
           'Error in CloudAiService post request (attempt $attempt/$totalAttempts): $e',
         );
-
-        if (attempt == totalAttempts) {
-          break;
-        }
 
         final backoff = _calculateBackoff(attempt, null);
         await Future.delayed(backoff);
       }
     }
 
-    if (lastError != null) {
-      debugPrint(
-        'Error in CloudAiService post request: $lastError\n$lastStackTrace',
-      );
-      Error.throwWithStackTrace(
-        lastError,
-        lastStackTrace ?? StackTrace.current,
-      );
-    }
-
-    return lastResponse!;
+    throw StateError('Unreachable');
   }
 
+  /// Parses the raw [response] from the chat completion endpoint into an [AiResponse].
+  ///
+  /// Extracts the assistant's message content and finish reason from the JSON payload.
+  /// Computes token usage using provided usage metrics or falls back to estimating tokens
+  /// from [prompt], [imageBytes], and response text (or using [estimatedPromptTokens] if supplied).
+  /// Calculates estimated cost based on the configured [modelName].
+  /// Returns `null` if the response contains no message content, or an [AiResponse.error]
+  /// if JSON decoding or parsing fails.
   @visibleForTesting
   Future<AiResponse?> parseResponse({
     required http.Response response,
