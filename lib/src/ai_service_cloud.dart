@@ -163,6 +163,11 @@ DateTime? _buildValidUtcDateTime(
 }
 
 class CloudAiService extends AiService {
+  /// HTTP status codes representing transient server or rate limiting errors
+  /// that are eligible for retry attempts (429, 500, 502, 503, 504).
+  @visibleForTesting
+  static const Set<int> retryableStatusCodes = {429, 500, 502, 503, 504};
+
   final String baseUrl;
   final String apiKey;
   final String modelName;
@@ -329,22 +334,17 @@ class CloudAiService extends AiService {
     );
   }
 
-  @override
-  Future<AiResponse?> generateContentRaw({
+  /// Constructs the JSON request body string for OpenAI-compatible chat completion endpoints.
+  ///
+  /// Formats the [prompt] and optional [imageBytes] into the messages payload,
+  /// and applies the specified [temperature] and optional [maxOutputTokens].
+  @visibleForTesting
+  String buildRequestBody({
     required String prompt,
     Uint8List? imageBytes,
     double temperature = 1.0,
     int? maxOutputTokens,
-  }) async {
-    int? estimatedPromptTokens;
-    if (_rateLimiter != null) {
-      estimatedPromptTokens = await countTokens(
-        prompt: prompt,
-        imageBytes: imageBytes,
-      );
-      await _rateLimiter.throttleBeforeRequest(estimatedPromptTokens);
-    }
-
+  }) {
     final List<Map<String, dynamic>> messages = [];
     if (imageBytes != null && imageBytes.isNotEmpty) {
       final base64Image = base64Encode(imageBytes);
@@ -362,17 +362,25 @@ class CloudAiService extends AiService {
       messages.add({'role': 'user', 'content': prompt});
     }
 
-    final body = jsonEncode({
+    return jsonEncode({
       'model': modelName,
       'messages': messages,
       'temperature': temperature,
       if (maxOutputTokens != null) 'max_tokens': maxOutputTokens,
     });
+  }
 
-    dynamic lastError;
-    StackTrace? lastStackTrace;
-    http.Response? lastResponse;
+  /// Sends the HTTP POST request to the chat completion endpoint with retry and backoff.
+  ///
+  /// Retries up to [maxRetries] times when encountering transient network errors
+  /// or retryable HTTP status codes ([retryableStatusCodes]). Returns the last
+  /// [http.Response] (which may have a non-200 status code if retries were exhausted
+  /// or if the status code was non-retryable), or rethrows the underlying exception
+  /// on terminal network failure.
+  @visibleForTesting
+  Future<http.Response> postWithRetry(String body) => _postWithRetry(body);
 
+  Future<http.Response> _postWithRetry(String body) async {
     final totalAttempts = maxRetries > 0 ? maxRetries + 1 : 1;
 
     for (int attempt = 1; attempt <= totalAttempts; attempt++) {
@@ -385,64 +393,71 @@ class CloudAiService extends AiService {
             )
             .timeout(requestTimeout);
 
-        lastResponse = response;
-        lastError = null;
-        lastStackTrace = null;
-
         if (response.statusCode == 200) {
-          break;
+          return response;
         }
 
         debugPrint(
           'CloudAiService response status ${response.statusCode} (attempt $attempt/$totalAttempts): ${response.body}',
         );
 
-        // Check if retryable status code: 429 (Rate Limit), 500, 502, 503, 504 (Server Errors)
-        final isRetryable = response.statusCode == 429 ||
-            response.statusCode == 500 ||
-            response.statusCode == 502 ||
-            response.statusCode == 503 ||
-            response.statusCode == 504;
-
+        final isRetryable = retryableStatusCodes.contains(response.statusCode);
         if (!isRetryable || attempt == totalAttempts) {
-          break;
+          return response;
         }
 
         final backoff = _calculateBackoff(attempt, response);
         await Future.delayed(backoff);
       } catch (e, stack) {
-        lastError = e;
-        lastStackTrace = stack;
+        if (attempt == totalAttempts) {
+          debugPrint(
+            'Error in CloudAiService post request: $e\n$stack',
+          );
+          Error.throwWithStackTrace(e, stack);
+        }
+
         debugPrint(
           'Error in CloudAiService post request (attempt $attempt/$totalAttempts): $e',
         );
-
-        if (attempt == totalAttempts) {
-          break;
-        }
 
         final backoff = _calculateBackoff(attempt, null);
         await Future.delayed(backoff);
       }
     }
 
-    if (lastError != null) {
-      debugPrint(
-        'Error in CloudAiService post request: $lastError\n$lastStackTrace',
-      );
-      return AiResponse.error(lastError);
-    }
+    throw StateError('Unreachable');
+  }
 
-    if (lastResponse == null || lastResponse.statusCode != 200) {
-      final statusCode = lastResponse?.statusCode ?? 500;
-      debugPrint(
-        'CloudAiService error response: $statusCode - ${lastResponse?.body}',
+  /// Parses the raw [response] from the chat completion endpoint into an [AiResponse].
+  ///
+  /// Extracts the assistant's message content and finish reason from the JSON payload.
+  /// Computes token usage using provided usage metrics or falls back to estimating tokens
+  /// from [prompt], [imageBytes], and response text (or using [estimatedPromptTokens] if supplied).
+  /// Calculates estimated cost based on the configured [modelName].
+  /// Returns `null` if the response contains no message content, or an [AiResponse.error]
+  /// if JSON decoding or parsing fails.
+  @visibleForTesting
+  Future<AiResponse?> parseResponse({
+    required http.Response response,
+    required String prompt,
+    Uint8List? imageBytes,
+    int? estimatedPromptTokens,
+  }) =>
+      _parseResponse(
+        response: response,
+        prompt: prompt,
+        imageBytes: imageBytes,
+        estimatedPromptTokens: estimatedPromptTokens,
       );
-      return AiResponse.error('Server returned code $statusCode');
-    }
 
+  Future<AiResponse?> _parseResponse({
+    required http.Response response,
+    required String prompt,
+    Uint8List? imageBytes,
+    int? estimatedPromptTokens,
+  }) async {
     try {
-      final data = jsonDecode(lastResponse.body);
+      final data = jsonDecode(response.body);
       final choices = data['choices'] as List?;
       final choice = (choices != null && choices.isNotEmpty)
           ? choices.first as Map<String, dynamic>?
@@ -485,6 +500,51 @@ class CloudAiService extends AiService {
       debugPrint('Error decoding CloudAiService response body: $e\n$stack');
       return AiResponse.error(e);
     }
+  }
+
+  @override
+  Future<AiResponse?> generateContentRaw({
+    required String prompt,
+    Uint8List? imageBytes,
+    double temperature = 1.0,
+    int? maxOutputTokens,
+  }) async {
+    int? estimatedPromptTokens;
+    if (_rateLimiter != null) {
+      estimatedPromptTokens = await countTokens(
+        prompt: prompt,
+        imageBytes: imageBytes,
+      );
+      await _rateLimiter.throttleBeforeRequest(estimatedPromptTokens);
+    }
+
+    final body = buildRequestBody(
+      prompt: prompt,
+      imageBytes: imageBytes,
+      temperature: temperature,
+      maxOutputTokens: maxOutputTokens,
+    );
+
+    http.Response response;
+    try {
+      response = await _postWithRetry(body);
+    } catch (e) {
+      return AiResponse.error(e);
+    }
+
+    if (response.statusCode != 200) {
+      debugPrint(
+        'CloudAiService error response: ${response.statusCode} - ${response.body}',
+      );
+      return AiResponse.error('Server returned code ${response.statusCode}');
+    }
+
+    return _parseResponse(
+      response: response,
+      prompt: prompt,
+      imageBytes: imageBytes,
+      estimatedPromptTokens: estimatedPromptTokens,
+    );
   }
 
   @override
