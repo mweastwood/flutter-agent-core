@@ -44,7 +44,7 @@ class CloudModelDatabase {
   /// Query which models are available, optionally filtering by provider and vision support.
   ///
   /// When called without filters ([provider] and [isVision] are `null`),
-  /// returns the cached [allModels] list.
+  /// returns the cached unmodifiable [allModels] list.
   static List<CloudModelInfo> getAvailableModels({
     CloudProvider? provider,
     bool? isVision,

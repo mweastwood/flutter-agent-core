@@ -28,6 +28,16 @@ void main() {
       final allModels = CloudModelDatabase.getAvailableModels();
       expect(identical(allModels, CloudModelDatabase.allModels), isTrue);
       expect(
+        identical(
+          CloudModelDatabase.getAvailableModels(
+            provider: null,
+            isVision: null,
+          ),
+          CloudModelDatabase.allModels,
+        ),
+        isTrue,
+      );
+      expect(
         () => allModels.add(allModels.first),
         throwsUnsupportedError,
       );
@@ -55,6 +65,18 @@ void main() {
       expect(zhipuOnly.every((m) => m.provider == CloudProvider.zhipu), isTrue);
       expect(zhipuOnly.any((m) => m.modelName == 'glm-4.7-flash'), isTrue);
       expect(zhipuOnly.any((m) => m.modelName == 'gemini-3.5-flash'), isFalse);
+
+      final visionOnly = CloudModelDatabase.getAvailableModels(
+        isVision: true,
+      );
+      expect(identical(visionOnly, CloudModelDatabase.allModels), isFalse);
+      expect(visionOnly.every((m) => m.isVision), isTrue);
+
+      final nonVisionOnly = CloudModelDatabase.getAvailableModels(
+        isVision: false,
+      );
+      expect(identical(nonVisionOnly, CloudModelDatabase.allModels), isFalse);
+      expect(nonVisionOnly.every((m) => !m.isVision), isTrue);
     });
 
     test('CloudModelDatabase getAvailableModelNames returns names', () {
@@ -158,6 +180,7 @@ void main() {
       final visionModels = CloudModelDatabase.getAvailableModels(
         isVision: true,
       );
+      expect(identical(visionModels, CloudModelDatabase.allModels), isFalse);
       expect(visionModels.every((m) => m.isVision), isTrue);
       expect(
         visionModels.any((m) => m.modelName == 'gemini-3.7-flash'),
@@ -165,6 +188,12 @@ void main() {
       );
       expect(visionModels.any((m) => m.modelName == 'glm-4v-flash'), isTrue);
       expect(visionModels.any((m) => m.modelName == 'glm-4.7-flash'), isFalse);
+
+      final nonVisionModels = CloudModelDatabase.getAvailableModels(
+        isVision: false,
+      );
+      expect(identical(nonVisionModels, CloudModelDatabase.allModels), isFalse);
+      expect(nonVisionModels.every((m) => !m.isVision), isTrue);
 
       final zhipuVisionNames = CloudModelDatabase.getAvailableModelNames(
         provider: CloudProvider.zhipu,
