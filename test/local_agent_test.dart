@@ -407,6 +407,93 @@ void main() {
       );
     });
 
+    test(
+      'accepts strongly-typed void Function(T, int) callback for onStep',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        TestStepResult? lastResult;
+        int? lastStep;
+        void callback(TestStepResult stepResult, int currentStep) {
+          lastResult = stepResult;
+          lastStep = currentStep;
+        }
+
+        await harness.runLoop(
+          userPrompt: 'stop immediately',
+          onStep: callback,
+        );
+
+        expect(lastResult, isNotNull);
+        expect(lastResult!.isFinish, isTrue);
+        expect(lastStep, equals(1));
+      },
+    );
+
+    test(
+      'accepts explicitly null onStep callback without error',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final steps = await harness.runLoop(
+          userPrompt: 'stop immediately',
+          onStep: null,
+        );
+
+        expect(steps.length, equals(1));
+        expect(steps.first.isFinish, isTrue);
+      },
+    );
+
+    test(
+      'invokes strongly-typed void Function(T, int) callback across steps',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'increment', 'tool': 'inc'},
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
+
+        final recordedResults = <TestStepResult>[];
+        final recordedSteps = <int>[];
+        void callback(TestStepResult stepResult, int currentStep) {
+          recordedResults.add(stepResult);
+          recordedSteps.add(currentStep);
+        }
+
+        final steps = await harness.runLoop(
+          userPrompt: 'count to 2',
+          onStep: callback,
+        );
+
+        expect(steps.length, equals(3));
+        expect(recordedResults.length, equals(3));
+        expect(recordedSteps, equals([1, 2, 3]));
+        expect(recordedResults[0].tool, equals('inc'));
+        expect(recordedResults[1].tool, equals('inc'));
+        expect(recordedResults[2].isFinish, isTrue);
+      },
+    );
+
     test('stops loop execution when maxSteps count is reached', () async {
       final mockAi = TestMockAiService([
         {'action': 'increment', 'tool': 'inc'},

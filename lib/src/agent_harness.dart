@@ -32,12 +32,15 @@ class AgentHarness<T> {
 
   /// Runs the agent reasoning-action loop.
   ///
+  /// [onStep]: Optional callback invoked after each step execution with the
+  /// step result and 1-based step counter.
+  ///
   /// Throws an [ArgumentError] if [maxSteps] is less than or equal to 0.
   Future<List<T>> runLoop({
     required String userPrompt,
     int maxSteps = 5,
     double temperature = 1.0,
-    Function(T stepResult, int currentStep)? onStep,
+    void Function(T stepResult, int currentStep)? onStep,
   }) async {
     if (maxSteps <= 0) {
       throw ArgumentError.value(
