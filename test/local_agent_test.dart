@@ -407,32 +407,35 @@ void main() {
       );
     });
 
-    test('accepts strongly-typed void Function(T, int) callback for onStep', () async {
-      final mockAi = TestMockAiService([
-        {'action': 'stop', 'tool': 'finish'},
-      ]);
-      final delegate = MockTextAgentDelegate();
-      final harness = AgentHarness<TestStepResult>(
-        aiService: mockAi,
-        delegate: delegate,
-      );
+    test(
+      'accepts strongly-typed void Function(T, int) callback for onStep',
+      () async {
+        final mockAi = TestMockAiService([
+          {'action': 'stop', 'tool': 'finish'},
+        ]);
+        final delegate = MockTextAgentDelegate();
+        final harness = AgentHarness<TestStepResult>(
+          aiService: mockAi,
+          delegate: delegate,
+        );
 
-      TestStepResult? lastResult;
-      int? lastStep;
-      void callback(TestStepResult stepResult, int currentStep) {
-        lastResult = stepResult;
-        lastStep = currentStep;
-      }
+        TestStepResult? lastResult;
+        int? lastStep;
+        void callback(TestStepResult stepResult, int currentStep) {
+          lastResult = stepResult;
+          lastStep = currentStep;
+        }
 
-      await harness.runLoop(
-        userPrompt: 'stop immediately',
-        onStep: callback,
-      );
+        await harness.runLoop(
+          userPrompt: 'stop immediately',
+          onStep: callback,
+        );
 
-      expect(lastResult, isNotNull);
-      expect(lastResult!.isFinish, isTrue);
-      expect(lastStep, equals(1));
-    });
+        expect(lastResult, isNotNull);
+        expect(lastResult!.isFinish, isTrue);
+        expect(lastStep, equals(1));
+      },
+    );
 
     test('stops loop execution when maxSteps count is reached', () async {
       final mockAi = TestMockAiService([
