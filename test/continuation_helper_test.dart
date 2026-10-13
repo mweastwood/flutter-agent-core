@@ -516,6 +516,10 @@ void main() {
         cleanContinuationChunk('   hello world   '),
         equals('   hello world   '),
       );
+      expect(cleanContinuationChunk('Continuation: }'), equals('}'));
+      expect(cleanContinuationChunk('Continuation: ]'), equals(']'));
+      expect(cleanContinuationChunk('Continuation: [1, 2]'), equals('[1, 2]'));
+      expect(cleanContinuationChunk('Continuation: - item'), equals('- item'));
     });
 
     test('stitchContinuation deduplicates overlapping chunks', () {

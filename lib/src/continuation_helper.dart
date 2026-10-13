@@ -14,7 +14,7 @@ final _reTrailingNewlines = RegExp(r'\r?\n+$');
 final _reLeadingCodeFence = RegExp(r'^\s*```');
 final _reTrailingCodeFence = RegExp(r'```\s*$');
 final _reConversationalHeader = RegExp(
-  r'^[a-zA-Z\s]+[:.]\s*(?=[{\[",\-\]])',
+  r'^[a-zA-Z\s]+[:.]\s*(?=[{}\[",\-\]])',
 );
 final _reCommonConversationalHeaders = [
   RegExp(r'^\s*here is the continuation:\s*', caseSensitive: false),
@@ -74,7 +74,11 @@ String cleanContinuationChunk(String chunk) {
 
   // Remove common conversational headers
   for (final header in _reCommonConversationalHeaders) {
-    cleaned = cleaned.replaceFirst(header, '');
+    final next = cleaned.replaceFirst(header, '');
+    if (next.length != cleaned.length) {
+      cleaned = next;
+      break;
+    }
   }
 
   return cleaned;
