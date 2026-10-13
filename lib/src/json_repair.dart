@@ -16,19 +16,16 @@ class _StackFrame {
   _ObjectState objectState;
   _ArrayState arrayState;
   int lastCompleteEntryEndPos;
-  int lastCommaPos;
 
   _StackFrame.object(this.lastCompleteEntryEndPos)
       : type = _ContainerType.object,
         objectState = _ObjectState.expectingKey,
-        arrayState = _ArrayState.expectingValue,
-        lastCommaPos = -1;
+        arrayState = _ArrayState.expectingValue;
 
   _StackFrame.array(this.lastCompleteEntryEndPos)
       : type = _ContainerType.array,
         objectState = _ObjectState.expectingKey,
-        arrayState = _ArrayState.expectingValue,
-        lastCommaPos = -1;
+        arrayState = _ArrayState.expectingValue;
 }
 
 final _reJsonNumber = RegExp(r'^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$');
@@ -246,7 +243,6 @@ String repairJson(String json) {
       i++;
       if (stack.isNotEmpty) {
         final top = stack.last;
-        top.lastCommaPos = output.length - 1;
         if (top.type == _ContainerType.object) {
           top.objectState = _ObjectState.expectingKey;
         } else {
