@@ -168,7 +168,6 @@ Future<String?> runWithAutoContinuation({
 
   final trimmed = text.trim();
   if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-    // ignore: invalid_use_of_visible_for_testing_member
     return repairJson(text);
   }
   return text;
