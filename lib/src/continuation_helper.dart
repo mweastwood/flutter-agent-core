@@ -11,8 +11,10 @@ final _reTruncatedTerminator = RegExp(r'[.!?}\]]');
 final _reTruncatedContinue = RegExp(r'[a-zA-Z0-9,"-]');
 final _reLeadingNewlines = RegExp(r'^\r?\n+');
 final _reTrailingNewlines = RegExp(r'\r?\n+$');
+final _reLeadingCodeFence = RegExp(r'^\s*```');
+final _reTrailingCodeFence = RegExp(r'```\s*$');
 final _reConversationalHeader = RegExp(
-  r'^[a-zA-Z\s\n]+[:.]\s*(?=[{\["",\-\]])',
+  r'^[a-zA-Z\s]+[:.]\s*(?=[{\[",\-\]])',
 );
 final _reCommonConversationalHeaders = [
   RegExp(r'^\s*here is the continuation:\s*', caseSensitive: false),
@@ -57,8 +59,8 @@ String cleanContinuationChunk(String chunk) {
   var cleaned = chunk;
 
   // Strip code fences if present
-  if (cleaned.trimLeft().startsWith('```') ||
-      cleaned.trimRight().endsWith('```')) {
+  if (_reLeadingCodeFence.hasMatch(cleaned) ||
+      _reTrailingCodeFence.hasMatch(cleaned)) {
     cleaned = stripMarkdownCodeFences(cleaned);
   }
 
@@ -72,9 +74,7 @@ String cleanContinuationChunk(String chunk) {
 
   // Remove common conversational headers
   for (final header in _reCommonConversationalHeaders) {
-    if (cleaned.startsWith(header)) {
-      cleaned = cleaned.replaceFirst(header, '');
-    }
+    cleaned = cleaned.replaceFirst(header, '');
   }
 
   return cleaned;
