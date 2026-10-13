@@ -493,9 +493,33 @@ void main() {
         equals('{"val": 1}'),
       );
       expect(
+        cleanContinuationChunk('   ```json\n{"val": 2}\n```   '),
+        equals('{"val": 2}'),
+      );
+      expect(
         cleanContinuationChunk('Here is the continuation:\n{"val": 1}'),
         equals('{"val": 1}'),
       );
+      expect(
+        cleanContinuationChunk('Continuing:\n{"val": 2}'),
+        equals('{"val": 2}'),
+      );
+      expect(
+        cleanContinuationChunk('continuation: {"val": 3}'),
+        equals('{"val": 3}'),
+      );
+      expect(
+        cleanContinuationChunk('Response with newline\nand header: "quoted"'),
+        equals('"quoted"'),
+      );
+      expect(
+        cleanContinuationChunk('   hello world   '),
+        equals('   hello world   '),
+      );
+      expect(cleanContinuationChunk('Continuation: }'), equals('}'));
+      expect(cleanContinuationChunk('Continuation: ]'), equals(']'));
+      expect(cleanContinuationChunk('Continuation: [1, 2]'), equals('[1, 2]'));
+      expect(cleanContinuationChunk('Continuation: - item'), equals('- item'));
     });
 
     test('stitchContinuation deduplicates overlapping chunks', () {
