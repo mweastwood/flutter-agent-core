@@ -26,6 +26,11 @@ void main() {
 
     test('CloudModelDatabase query APIs return expected models', () {
       final allModels = CloudModelDatabase.getAvailableModels();
+      expect(identical(allModels, CloudModelDatabase.allModels), isTrue);
+      expect(
+        () => allModels.add(allModels.first),
+        throwsUnsupportedError,
+      );
       expect(allModels, isNotEmpty);
       expect(allModels.any((m) => m.modelName == 'gemini-3.7-flash'), isTrue);
       expect(allModels.any((m) => m.modelName == 'gemini-3.5-flash'), isTrue);
@@ -34,6 +39,7 @@ void main() {
       final geminiOnly = CloudModelDatabase.getAvailableModels(
         provider: CloudProvider.gemini,
       );
+      expect(identical(geminiOnly, CloudModelDatabase.allModels), isFalse);
       expect(
         geminiOnly.every((m) => m.provider == CloudProvider.gemini),
         isTrue,
@@ -45,6 +51,7 @@ void main() {
       final zhipuOnly = CloudModelDatabase.getAvailableModels(
         provider: CloudProvider.zhipu,
       );
+      expect(identical(zhipuOnly, CloudModelDatabase.allModels), isFalse);
       expect(zhipuOnly.every((m) => m.provider == CloudProvider.zhipu), isTrue);
       expect(zhipuOnly.any((m) => m.modelName == 'glm-4.7-flash'), isTrue);
       expect(zhipuOnly.any((m) => m.modelName == 'gemini-3.5-flash'), isFalse);
