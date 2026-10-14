@@ -126,7 +126,6 @@ class ChunkedBuffer {
 /// Repairs truncated or malformed JSON output by balancing braces,
 /// completing unclosed quotes, rolling back dangling keys and colons,
 /// and stripping trailing commas.
-@visibleForTesting
 String repairJson(String json) {
   if (json.isEmpty) return '';
 
